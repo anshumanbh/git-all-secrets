@@ -2,10 +2,10 @@
 
 
 ## What is this about?
-git-all-secrets is a tool that will
-    * Clone multiple public github repositories locally,
-    * Scan them using tools such as [truffleHog](https://github.com/dxa4481/truffleHog) and [git-secrets](https://github.com/awslabs/git-secrets),
-    * Combine the output from all files from both the tools into one consolidated output file
+git-all-secrets is a tool that will:
+* Clone multiple public github repositories locally,
+* Scan them using tools such as [truffleHog](https://github.com/dxa4481/truffleHog) and [git-secrets](https://github.com/awslabs/git-secrets),
+* Combine the output from all files from both the tools into one consolidated output file
 
 ## What was the need to write yet another tool to look for secrets in github repositories?
 I looked at a large number of open source tools that could be potentially used to look for secrets in github repositories. Some of the top tools that I thought were good are: [gitrob](https://github.com/michenriksen/gitrob), [truffleHog](https://github.com/dxa4481/truffleHog) and [git-secrets](https://github.com/awslabs/git-secrets).
@@ -13,9 +13,9 @@ I looked at a large number of open source tools that could be potentially used t
 Gitrob is meant to be a standalone tool that is pretty difficult to integrate with other tools because it has its own database and UI to see all the secrets discovered. It also produces a ton of false positives, more than truffleHog. And, it doesn't really highlight the secrets discovered. It just looks at the files and their extensions, not the actual content. So, although Gitrob is a great tool to get started with, I would recommend running it every once in a while to understand what the attack surface looks like and see if it has changed.
 
 Then, there is truffleHog that looks for secrets in the actual contents of the file by looking at Shannon's entropy and prints the output on the screen. It takes in a repository URL or a repository directory as an argument. This is a pretty good tool although it does have its share of false positives. Some of the other drawbacks are:
-    * We can't use it recursively to scan directories that contain multiple repositories.
-    * There is no way we can use truffleHog to identify secrets that follow a certain pattern but don't have a high enough entropy i.e. we can't make it look for secrets that we know of but not necessarily have high entropy to be considered as a secret.
-    * It prints the output on the screen so not really useful for automation as such.
+* We can't use it recursively to scan directories that contain multiple repositories.
+* There is no way we can use truffleHog to identify secrets that follow a certain pattern but don't have a high enough entropy i.e. we can't make it look for secrets that we know of but not necessarily have high entropy to be considered as a secret.
+* It prints the output on the screen so not really useful for automation as such.
 
 Finally, there is git-secrets which can flag things like AWS secrets. The best part is that you can add your own regular expressions as well for secrets that you know it should be looking for. A major drawback is that it doesn't do a good job on finding high entropy strings like truffleHog does. You can also only scan a particular directory that is a repository so no recursion scanning from a directory of repositories either.
 
