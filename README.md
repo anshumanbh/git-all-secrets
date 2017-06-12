@@ -48,6 +48,22 @@ If you don't have docker and don't want to install it, you can still run git-all
 * You also need to git clone my fork of git-secrets from [here](https://github.com/anshumanbh/git-secrets) because that codebase is slightly different as well from the main git-secrets codebase. And, then install it like how you would install git-secrets.
 * Finally, type `go run main.go -org=<> -token=<> -output=<>`
 
+## What are all the options that I can run git-all-secrets with?
+If you are running using Docker, type `docker run --rm -it abhartiya/tools_gitallsecrets --help` to see all the option flags
+
+If you are running without Docker, type `go run main.go --help` to see all the option flags
+
+* -token = Github personal access token. We need this because unauthenticated requests to the Github API can hit the rate limiting pretty soon!
+* -org = Name of the Organization to scan. This will scan all repos in the org + all the repos & gists of all users in the org.
+* -user = Name of the User to scan. This will scan all the repos & gists of this user.
+* -repoURL = HTTPS URL of the Repo to scan. This will scan this repository only.
+* -gistURL = HTTPS URL of the Gist to scan. This will scan this gist only.
+* -output = This is the name of the file where all the results will get stored. By default, this is `results.txt`
+
+## Note
+* The `token` flag is compulsory. This can't be empty.
+* The `org`, `user`, `repoURL` and `gistURL` can't be all empty at the same time. You need to provide just one of these values. If you provide all of them or multiple values together, the order of precendence will be `org` > `user` > `repoURL` > `gistURL`. For instance, if you provide both the flags `-org=secretorg123` and `-user=secretuser1` together, the tool will complain that it doesn't need anything along with the `org` value. To run it against a particular user only, just need to provide the `user` flag and not the `org` flag.
+
 ## Demo
 A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu.be
 

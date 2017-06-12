@@ -19,6 +19,15 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+var (
+	org        = flag.String("org", "", "Name of the Organization to scan. Example: secretorg123")
+	token      = flag.String("token", "", "Github Personal Access Token. This is required.")
+	outputFile = flag.String("output", "results.txt", "Output file to save the results")
+	user       = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
+	repoURL    = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
+	gistURL    = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
+)
+
 // Info Function to show colored text
 func Info(format string, args ...interface{}) {
 	fmt.Printf("\x1b[34;1m%s\x1b[0m\n", fmt.Sprintf(format, args...))
@@ -261,13 +270,62 @@ func combineOutput(outputfile string) error {
 	return nil
 }
 
+func scanorgrepos(org string) error {
+	var wgorg sync.WaitGroup
+
+	gitorgrepos, _ := ioutil.ReadDir("/tmp/repos/org/")
+	for _, f := range gitorgrepos {
+		wgorg.Add(1)
+		go runGitTools("/tmp/repos/org/"+f.Name()+"/", &wgorg, f.Name(), org)
+	}
+	wgorg.Wait()
+	return nil
+}
+
+func checkflags(token, org, user, repoURL, gistURL string) error {
+	if token == "" {
+		fmt.Println("Need a Github personal access token. Please provide that using the -token flag")
+		os.Exit(2)
+	} else if org == "" && user == "" && repoURL == "" && gistURL == "" {
+		fmt.Println("org, user, repoURL and gistURL can't all be empty. Please provide just one of these values")
+		os.Exit(2)
+	} else if org != "" && (user != "" || repoURL != "" || gistURL != "") {
+		fmt.Println("Can't have org along with any of user, repoURL or gistURL. Please provide just one of these values")
+		os.Exit(2)
+	} else if user != "" && (org != "" || repoURL != "" || gistURL != "") {
+		fmt.Println("Can't have user along with any of org, repoURL or gistURL. Please provide just one of these values")
+		os.Exit(2)
+	} else if repoURL != "" && (org != "" || user != "" || gistURL != "") {
+		fmt.Println("Can't have repoURL along with any of org, user or gistURL. Please provide just one of these values")
+		os.Exit(2)
+	} else if gistURL != "" && (org != "" || repoURL != "" || user != "") {
+		fmt.Println("Can't have gistURL along with any of org, user or repoURL. Please provide just one of these values")
+		os.Exit(2)
+	}
+	return nil
+}
+
+func makeDirectories() error {
+	os.MkdirAll("/tmp/repos/org", 0700)
+	os.MkdirAll("/tmp/repos/users", 0700)
+	os.MkdirAll("/tmp/repos/singlerepo", 0700)
+	os.MkdirAll("/tmp/repos/singlegist", 0700)
+	os.MkdirAll("/tmp/results/thog", 0700)
+	os.MkdirAll("/tmp/results/gitsecrets", 0700)
+
+	return nil
+}
+
 func main() {
 
-	org := flag.String("org", "", "Name of the Organization to scan")
-	token := flag.String("token", "", "Github Personal Access Token")
-	outputFile := flag.String("output", "", "Output file to save the results")
+	//Parsing the flags
 	flag.Parse()
 
+	//Logic to check the program is ingesting proper flags
+	err := checkflags(*token, *org, *user, *repoURL, *gistURL)
+	check(err)
+
+	//Authenticating to Github using the token
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: *token},
@@ -275,53 +333,112 @@ func main() {
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
 
-	os.MkdirAll("/tmp/repos/org", 0700)
-	os.MkdirAll("/tmp/repos/users", 0700)
-	os.MkdirAll("/tmp/results/thog", 0700)
-	os.MkdirAll("/tmp/results/gitsecrets", 0700)
-
-	err := cloneorgrepos(ctx, client, *org)
+	//Creating some temp directories to store repos & results. These will be deleted in the end
+	err = makeDirectories()
 	check(err)
 
-	allUsers, err := listallusers(ctx, client, *org)
-	check(err)
+	//By now, we either have the org, user, repoURL or the gistURL. The program flow changes accordingly..
 
-	//iterating through the allUsers array
-	for _, user := range allUsers {
+	if *org != "" { //If org was supplied
+		Info("Since org was provided, the tool will proceed to scan all the org repos, then all the user repos and user gists in a recursive manner")
 
-		err1 := cloneuserrepos(ctx, client, *user.Login)
+		//cloning all the repos of the org
+		err := cloneorgrepos(ctx, client, *org)
+		check(err)
+
+		//getting all the users of the org into the allUsers array
+		allUsers, err := listallusers(ctx, client, *org)
+		check(err)
+
+		//iterating through the allUsers array
+		for _, user := range allUsers {
+
+			//cloning all the repos of a user
+			err1 := cloneuserrepos(ctx, client, *user.Login)
+			check(err1)
+
+			//cloning all the gists of a user
+			err2 := cloneusergists(ctx, client, *user.Login)
+			check(err2)
+
+		}
+
+		Info("Scanning all org repositories now..This may take a while so please be patient\n")
+		err = scanorgrepos(*org)
+		check(err)
+		Info("Finished scanning all org repositories\n")
+
+		Info("Scanning all user repositories and gists now..This may take a while so please be patient\n")
+		var wguser sync.WaitGroup
+		for _, user := range allUsers {
+			wguser.Add(1)
+			go scanforeachuser(*user.Login, &wguser)
+		}
+		wguser.Wait()
+		Info("Finished scanning all user repositories and gists\n")
+
+	} else if *user != "" { //If user was supplied
+		Info("Since user was provided, the tool will proceed to scan all the user repos and user gists\n")
+		err1 := cloneuserrepos(ctx, client, *user)
 		check(err1)
 
-		err2 := cloneusergists(ctx, client, *user.Login)
+		err2 := cloneusergists(ctx, client, *user)
 		check(err2)
 
+		Info("Scanning all user repositories and gists now..This may take a while so please be patient\n")
+		var wguseronly sync.WaitGroup
+		wguseronly.Add(1)
+		go scanforeachuser(*user, &wguseronly)
+		wguseronly.Wait()
+		Info("Finished scanning all user repositories and gists\n")
+
+	} else if *repoURL != "" || *gistURL != "" { //If either repoURL or gistURL was supplied
+
+		var url, repoorgist, fpath, rn, lastString string
+		var bpath = "/tmp/repos/"
+
+		if *repoURL != "" { //repoURL
+			url = *repoURL
+			repoorgist = "repo"
+		} else { //gistURL
+			url = *gistURL
+			repoorgist = "gist"
+		}
+
+		Info("The tool will proceed to clone and scan: " + url + " only\n")
+
+		splitArray := strings.Split(url, "/")
+		lastString = splitArray[len(splitArray)-1]
+		orgoruserName := splitArray[3]
+
+		switch repoorgist {
+		case "repo":
+			rn = strings.Split(lastString, ".")[0]
+			fpath = bpath + "singlerepo/" + rn
+		case "gist":
+			rn = lastString
+			fpath = bpath + "singlegist/" + lastString
+		}
+
+		//cloning
+		Info("Starting to clone: " + url + "\n")
+		var wgo sync.WaitGroup
+		wgo.Add(1)
+		go gitclone(url, fpath, &wgo)
+		wgo.Wait()
+		Info("Cloning of: " + url + " finished\n")
+
+		//scanning
+		Info("Starting to scan: " + url + "\n")
+		var wgs sync.WaitGroup
+		wgs.Add(1)
+		go runGitTools(fpath+"/", &wgs, rn, orgoruserName)
+		wgs.Wait()
+		Info("Scanning of: " + url + " finished\n")
+
 	}
 
-	Info("We have all the repositories & gists now. Lets get to scanning them..\n")
-	Info("Scanning all org repositories with truffleHog and git-secrets now..This may take a while so please be patient")
-
-	var wgorg sync.WaitGroup
-
-	gitorgrepos, _ := ioutil.ReadDir("/tmp/repos/org/")
-	for _, f := range gitorgrepos {
-		wgorg.Add(1)
-		go runGitTools("/tmp/repos/org/"+f.Name()+"/", &wgorg, f.Name(), *org)
-	}
-	wgorg.Wait()
-
-	Info("Finished scanning all org repositories\n")
-
-	Info("Scanning all user repositories and gists now..This may take a while so please be patient")
-
-	var wguser sync.WaitGroup
-	for _, user := range allUsers {
-		wguser.Add(1)
-		go scanforeachuser(*user.Login, &wguser)
-	}
-	wguser.Wait()
-
-	Info("Finished scanning all user repositories and gists\n")
-
+	//Now, that all the scanning has finished, time to combine the output
 	Info("Combining the output from all the tools into one file\n")
 	err = combineOutput(*outputFile)
 	check(err)
