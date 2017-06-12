@@ -3,10 +3,19 @@
 
 
 ## About
-git-all-secrets is a tool that will:
-* Clone multiple public github repositories locally,
-* Scan them using tools such as [truffleHog](https://github.com/dxa4481/truffleHog) and [git-secrets](https://github.com/awslabs/git-secrets),
-* Combine the output from all files from both the tools into one consolidated output file
+git-all-secrets is a tool that can:
+* Clone multiple public github repositories of an organization and scan them,
+* Clone multiple public github repositories of a user that belongs to an organization and scan them,
+* Clone a single repository of an organization/user and scan it,
+* Clone a single gist of a user and scan it
+* All of the above together!! Oh yeah!! Simply provide an organization name and get all their secrets.
+
+Scanning is done by multiple open source tools such as:
+* [truffleHog](https://github.com/dxa4481/truffleHog) and
+* [git-secrets](https://github.com/awslabs/git-secrets)
+NOTE - More such tools can be added in future, if desired!
+
+The final output from the tool combines the output from all files from all the tools into one consolidated output file
 
 
 ## Getting started
