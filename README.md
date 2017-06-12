@@ -11,14 +11,15 @@ git-all-secrets is a tool that will:
 
 ## Getting started
 The easiest way to run `git-all-secrets` is via Docker and I highly recommend installing Docker if you don't already have it. Once you have Docker installed,
-* Type `docker run -it abhartiya/tools_gitallsecrets -org=<> -token=<> -output=<>`.
+* Type `docker run --rm -it abhartiya/tools_gitallsecrets --help` to understand the different flags it can take as inputs.
+* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets -token=<> -output=<> -org=<>`
 * After the container finishes running, retrieve the container ID by typing `docker ps -a`.
 * Once you have the container ID, get the results file from the container to the host by typing `docker cp <container-id>:/data/<output-file> .`
 
 If you don't have docker and don't want to install it, you can still run git-all-secrets. However, you need to do a few things before that.
 * You need to git clone this repository since the codebase for truffleHog inside this repository is slightly different from the main truffleHog codebase. After cloning, make sure you can run truffleHog by typing `./thog/truffleHog/truffleHog.py`
 * You also need to git clone my fork of git-secrets from [here](https://github.com/anshumanbh/git-secrets) because that codebase is slightly different as well from the main git-secrets codebase. And, then install it like how you would install git-secrets.
-* Finally, type `go run main.go -org=<> -token=<> -output=<>`
+* Finally, type `go run main.go --help` and `go run main.go -org=<> -token=<> -output=<>`
 
 
 ## Flags/Options
