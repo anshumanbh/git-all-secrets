@@ -13,6 +13,7 @@ git-all-secrets is a tool that can:
 Scanning is done by multiple open source tools such as:
 * [truffleHog](https://github.com/dxa4481/truffleHog) and
 * [git-secrets](https://github.com/awslabs/git-secrets)
+
 NOTE - More such tools can be added in future, if desired!
 
 The final output from the tool combines the output from all files from all the tools into one consolidated output file
@@ -32,10 +33,6 @@ If you don't have docker and don't want to install it, you can still run git-all
 
 
 ## Flags/Options
-If you are running using Docker, type `docker run --rm -it abhartiya/tools_gitallsecrets --help` to see all the option flags
-
-If you are running without Docker, type `go run main.go --help` to see all the option flags
-
 * -token = Github personal access token. We need this because unauthenticated requests to the Github API can hit the rate limiting pretty soon!
 * -org = Name of the Organization to scan. This will scan all repos in the org + all the repos & gists of all users in the org.
 * -user = Name of the User to scan. This will scan all the repos & gists of this user.
@@ -57,18 +54,11 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 
 
 ## Details
-### How does git-all-secrets work?
-* You provide it an organization name.
-* It will clone all repositories of that organization.
-* After that, it will go through all the members of that organization and clone their personal repositories and gists as well. The need to do this is because users of an organization might have their own individual repositories that they might commit the organization secrets to so we need to find them!!
-* It then scans each repository - all the org repositories and the user repositories and the user gists using both truffleHog and gitsecrets.
-* It finally combines all the output of each repository scanned by both the tools into one file. This file can be pretty big depending upon how big of an organization you are scanning and how many users it has.
-
 ### Features
 * It uses Golang and GoRoutines. Things like cloning of repositories, running the tools on each of those repositories are all multi-threaded so it makes it super fast. Give it a try!
 * It also looks for Slack tokens that have the pattern `xoxp-` and `xoxb-`. Take a look at [this](https://labs.detectify.com/2016/04/28/slack-bot-token-leakage-exposing-business-critical-information/) article to understand why scanning these tokens are super important.
 * As mentioned above, it also looks for users gists.
-* If there is a new tool that is good, it can be integrated into `git-all-secrets` pretty effortlessly. All you need to do is integrate it in the functions `runGitTools` and `combineOutput` inside the file `main.go`
+* If there is a new tool that is good, it can be integrated into `git-all-secrets` pretty effortlessly.
 * It is built for integration with other tools and frameworks. It takes in a few input parameters and produces an output file of the results. Pretty straightforward!
 * If there are new patterns that need to be added, adding those is pretty easy as well. Take a look at the file `rungitsecrets.sh` and check how the `xoxp-` and `xoxb-` patterns were added.
 * It uses truffleHog and git-secrets with some modifications to their codebase to make the output much better. `truffleHog` doesn't output the results to a file so that has been added. `git-secrets` has a lot of unnecessary output even when no secret is found so some of that output is removed for better readability.
