@@ -184,6 +184,13 @@ func runGitTools(filepath string, wg *sync.WaitGroup, reponame string, orgoruser
 	err2 := cmd2.Run()
 	check(err2)
 
+	outputFile3 := "/tmp/results/repo-supervisor/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
+	cmd3 := exec.Command("./runreposupervisor.sh", filepath, outputFile3)
+	var out3 bytes.Buffer
+	cmd3.Stdout = &out3
+	err3 := cmd3.Run()
+	check(err3)
+
 	wg.Done()
 }
 
@@ -251,7 +258,7 @@ func combineOutput(outputfile string) error {
 	of, err := os.Create(outputfile)
 	check(err)
 
-	tools := []string{"thog", "gitsecrets"}
+	tools := []string{"thog", "gitsecrets", "repo-supervisor"}
 
 	for _, tool := range tools {
 		err = toolOutput(tool, of)
@@ -259,8 +266,8 @@ func combineOutput(outputfile string) error {
 	}
 
 	defer func() {
-		os.RemoveAll("/tmp/repos/")
-		os.RemoveAll("/tmp/results/")
+		// os.RemoveAll("/tmp/repos/")
+		// os.RemoveAll("/tmp/results/")
 		cerr := of.Close()
 		if err == nil {
 			err = cerr
@@ -312,6 +319,7 @@ func makeDirectories() error {
 	os.MkdirAll("/tmp/repos/singlegist", 0700)
 	os.MkdirAll("/tmp/results/thog", 0700)
 	os.MkdirAll("/tmp/results/gitsecrets", 0700)
+	os.MkdirAll("/tmp/results/repo-supervisor", 0700)
 
 	return nil
 }

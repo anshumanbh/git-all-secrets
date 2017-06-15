@@ -11,8 +11,9 @@ git-all-secrets is a tool that can:
 * All of the above together!! Oh yeah!! Simply provide an organization name and get all their secrets.
 
 Scanning is done by multiple open source tools such as:
-* [truffleHog](https://github.com/dxa4481/truffleHog) and
-* [git-secrets](https://github.com/awslabs/git-secrets)
+* [truffleHog](https://github.com/dxa4481/truffleHog) - scans commits for high entropy strings,
+* [git-secrets](https://github.com/awslabs/git-secrets) - scans for things like AWS secrets, Slack tokens, and any other regular expressions you want to search for,
+* [repo-supervisor] (https://github.com/auth0/repo-supervisor) - scans for high entropy strings in .js and .json files
 
 NOTE - More such tools can be added in future, if desired!
 
@@ -21,15 +22,14 @@ The final output from the tool combines the output from all files from all the t
 
 ## Getting started
 The easiest way to run `git-all-secrets` is via Docker and I highly recommend installing Docker if you don't already have it. Once you have Docker installed,
-* Type `docker run --rm -it abhartiya/tools_gitallsecrets --help` to understand the different flags it can take as inputs.
-* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets -token=<> -output=<> -org=<>`
+* Type `docker run --rm -it abhartiya/tools_gitallsecrets:v1 --help` to understand the different flags it can take as inputs.
+* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets:v1 -token=<> -org=<>`
 * After the container finishes running, retrieve the container ID by typing `docker ps -a`.
-* Once you have the container ID, get the results file from the container to the host by typing `docker cp <container-id>:/data/<output-file> .`
+* Once you have the container ID, get the results file from the container to the host by typing `docker cp <container-id>:/data/results.txt .`
 
-If you don't have docker and don't want to install it, you can still run git-all-secrets. However, you need to do a few things before that.
-* You need to git clone this repository since the codebase for truffleHog inside this repository is slightly different from the main truffleHog codebase. After cloning, make sure you can run truffleHog by typing `./thog/truffleHog/truffleHog.py`
-* You also need to git clone my fork of git-secrets from [here](https://github.com/anshumanbh/git-secrets) because that codebase is slightly different as well from the main git-secrets codebase. And, then install it like how you would install git-secrets.
-* Finally, type `go run main.go --help` and `go run main.go -org=<> -token=<> -output=<>`
+PS - Since I am going to keep adding more tools, supporting non-Docker running instructions is likely not going to happen! For instance, I just added the `repo-supervisor` tool to scan and setting it up was the biggest PITA ever. How much have I started to hate node and npm and nvm and blah..!
+
+In other words, if you wish to use `git-all-secrets`, please use Docker! I have also uploaded the Docker image to my public Docker hub account. All you need to do is pull it and run it.
 
 
 ## Flags/Options
@@ -51,6 +51,11 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 
 ## TODO
 * Support scanning Github Enterprise
+* Add flag to avoid scanning forks
+
+
+## Known Bugs
+* I am aware of a bug with goroutines. This normally happens, when you try to scan a big org with a lot of users who have a lot of repositories. A lot of goroutines are spawned to do the scanning and if the machine is not beefy enough, the goroutines are going to complain. To solve this, the only most practical solution I can think of is to not scan a big org. Maybe, scan in batches. I am open to suggestions here!
 
 
 ## Details
@@ -77,3 +82,5 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
+### Changelog
+* 6/14/17 - Added repo-supervisor as a scanning tool, also updated and added the version number to the docker image - abhartiya/tools_gitallsecrets:v1
