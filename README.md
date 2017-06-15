@@ -13,7 +13,7 @@ git-all-secrets is a tool that can:
 Scanning is done by multiple open source tools such as:
 * [truffleHog](https://github.com/dxa4481/truffleHog) - scans commits for high entropy strings,
 * [git-secrets](https://github.com/awslabs/git-secrets) - scans for things like AWS secrets, Slack tokens, and any other regular expressions you want to search for,
-* [repo-supervisor] (https://github.com/auth0/repo-supervisor) - scans for high entropy strings in .js and .json files
+* [repo-supervisor](https://github.com/auth0/repo-supervisor) - scans for high entropy strings in .js and .json files
 
 NOTE - More such tools can be added in future, if desired!
 
