@@ -38,7 +38,8 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -user = Name of the User to scan. This will scan all the repos & gists of this user.
 * -repoURL = HTTPS URL of the Repo to scan. This will scan this repository only.
 * -gistURL = HTTPS URL of the Gist to scan. This will scan this gist only.
-* -output = This is the name of the file where all the results will get stored. By default, this is `results.txt`
+* -output = This is the name of the file where all the results will get stored. By default, this is `results.txt`.
+* -cloneForks = This is the optional boolean flag to clone forks of org and user repositories. By default, this is set to `0` i.e. no cloning of forks. If forks are to be cloned, this value needs to be set to `1`.
 
 ### Note
 * The `token` flag is compulsory. This can't be empty.
@@ -51,7 +52,7 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 
 ## TODO
 * Support scanning Github Enterprise
-* Add flag to avoid scanning forks
+* ~~Add flag to avoid scanning forks~~ - DONE!
 
 
 ## Known Bugs
@@ -84,3 +85,4 @@ So, as you can see, there are decent tools out there, but they had to be combine
 
 ### Changelog
 * 6/14/17 - Added repo-supervisor as a scanning tool, also updated and added the version number to the docker image - abhartiya/tools_gitallsecrets:v1
+* 6/14/17 - Added the flag cloneForks to avoid cloning forks of org and user repos. By default, this is false. If you wish to scan forks, just set the value to 1 i.e. -cloneForks=1

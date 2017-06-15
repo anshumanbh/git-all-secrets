@@ -22,10 +22,11 @@ import (
 var (
 	org        = flag.String("org", "", "Name of the Organization to scan. Example: secretorg123")
 	token      = flag.String("token", "", "Github Personal Access Token. This is required.")
-	outputFile = flag.String("output", "results.txt", "Output file to save the results")
+	outputFile = flag.String("output", "results.txt", "Output file to save the results. Default is results.txt")
 	user       = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
 	repoURL    = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
 	gistURL    = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
+	cloneForks = flag.Bool("cloneForks", false, "Option to clone org and user repos that are forks. Default is false")
 )
 
 // Info Function to show colored text
@@ -73,10 +74,24 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 	var orgclone sync.WaitGroup
 	//iterating through the repo array
 	for _, repo := range orgRepos {
-		orgclone.Add(1)
-		fmt.Println(*repo.CloneURL)
-		//cloning the individual org repos
-		go gitclone(*repo.CloneURL, "/tmp/repos/org/"+*repo.Name, &orgclone)
+
+		switch *cloneForks {
+		case true:
+			//cloning everything
+			orgclone.Add(1)
+			fmt.Println(*repo.CloneURL)
+			//cloning the individual org repos
+			go gitclone(*repo.CloneURL, "/tmp/repos/org/"+*repo.Name, &orgclone)
+		case false:
+			//not cloning forks
+			if !*repo.Fork {
+				orgclone.Add(1)
+				fmt.Println(*repo.CloneURL)
+				//cloning the individual org repos
+				go gitclone(*repo.CloneURL, "/tmp/repos/org/"+*repo.Name, &orgclone)
+			}
+		}
+
 	}
 	orgclone.Wait()
 	fmt.Println("")
@@ -104,11 +119,20 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 	var userrepoclone sync.WaitGroup
 	//iterating through the userRepos array
 	for _, userRepo := range userRepos {
-		userrepoclone.Add(1)
-		fmt.Println(*userRepo.CloneURL)
-
-		//cloning the individual user repos
-		go gitclone(*userRepo.CloneURL, "/tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepoclone)
+		switch *cloneForks {
+		case true:
+			//cloning everything
+			userrepoclone.Add(1)
+			fmt.Println(*userRepo.CloneURL)
+			go gitclone(*userRepo.CloneURL, "/tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepoclone)
+		case false:
+			//not cloning forks
+			if !*userRepo.Fork {
+				userrepoclone.Add(1)
+				fmt.Println(*userRepo.CloneURL)
+				go gitclone(*userRepo.CloneURL, "/tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepoclone)
+			}
+		}
 
 	}
 
