@@ -22,11 +22,12 @@ import (
 var (
 	org        = flag.String("org", "", "Name of the Organization to scan. Example: secretorg123")
 	token      = flag.String("token", "", "Github Personal Access Token. This is required.")
-	outputFile = flag.String("output", "results.txt", "Output file to save the results. Default is results.txt")
+	outputFile = flag.String("output", "results.txt", "Output file to save the results.")
 	user       = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
 	repoURL    = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
 	gistURL    = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
 	cloneForks = flag.Bool("cloneForks", false, "Option to clone org and user repos that are forks. Default is false")
+	toolName   = flag.String("toolName", "all", "Specify whether to run gitsecrets, thog or repo-supervisor")
 )
 
 // Info Function to show colored text
@@ -193,27 +194,59 @@ func listallusers(ctx context.Context, client *github.Client, org string) ([]*gi
 	return allUsers, nil
 }
 
-func runGitTools(filepath string, wg *sync.WaitGroup, reponame string, orgoruser string) {
-	outputFile1 := "/tmp/results/thog/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
-	cmd1 := exec.Command("./thog/truffleHog/truffleHog.py", "-o", outputFile1, filepath)
-	var out1 bytes.Buffer
-	cmd1.Stdout = &out1
-	err1 := cmd1.Run()
-	check(err1)
-
+func runGitsecrets(filepath string, reponame string, orgoruser string) error {
 	outputFile2 := "/tmp/results/gitsecrets/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
 	cmd2 := exec.Command("./rungitsecrets.sh", filepath, outputFile2)
 	var out2 bytes.Buffer
 	cmd2.Stdout = &out2
 	err2 := cmd2.Run()
 	check(err2)
+	return nil
+}
 
+func runTrufflehog(filepath string, reponame string, orgoruser string) error {
+	outputFile1 := "/tmp/results/thog/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
+	cmd1 := exec.Command("./thog/truffleHog/truffleHog.py", "-o", outputFile1, filepath)
+	var out1 bytes.Buffer
+	cmd1.Stdout = &out1
+	err1 := cmd1.Run()
+	check(err1)
+	return nil
+}
+
+func runReposupervisor(filepath string, reponame string, orgoruser string) error {
 	outputFile3 := "/tmp/results/repo-supervisor/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
 	cmd3 := exec.Command("./runreposupervisor.sh", filepath, outputFile3)
 	var out3 bytes.Buffer
 	cmd3.Stdout = &out3
 	err3 := cmd3.Run()
 	check(err3)
+	return nil
+}
+
+func runGitTools(tool string, filepath string, wg *sync.WaitGroup, reponame string, orgoruser string) {
+
+	switch tool {
+	case "all":
+		err := runGitsecrets(filepath, reponame, orgoruser)
+		check(err)
+		err = runTrufflehog(filepath, reponame, orgoruser)
+		check(err)
+		err = runReposupervisor(filepath, reponame, orgoruser)
+		check(err)
+
+	case "gitsecrets":
+		err := runGitsecrets(filepath, reponame, orgoruser)
+		check(err)
+
+	case "thog":
+		err := runTrufflehog(filepath, reponame, orgoruser)
+		check(err)
+
+	case "repo-supervisor":
+		err := runReposupervisor(filepath, reponame, orgoruser)
+		check(err)
+	}
 
 	wg.Done()
 }
@@ -223,13 +256,14 @@ func scanforeachuser(user string, wg *sync.WaitGroup) {
 	gituserrepos, _ := ioutil.ReadDir("/tmp/repos/users/" + user)
 	for _, f := range gituserrepos {
 		wguserrepogist.Add(1)
-		go runGitTools("/tmp/repos/users/"+user+"/"+f.Name()+"/", &wguserrepogist, f.Name(), user)
+		go runGitTools(*toolName, "/tmp/repos/users/"+user+"/"+f.Name()+"/", &wguserrepogist, f.Name(), user)
+
 	}
 	wguserrepogist.Wait()
 	wg.Done()
 }
 
-func toolOutput(toolname string, of *os.File) error {
+func toolsOutput(toolname string, of *os.File) error {
 
 	linedelimiter := "----------------------------------------------------------------------------" +
 		"----------------------------------------------------------------------------" +
@@ -274,7 +308,32 @@ func toolOutput(toolname string, of *os.File) error {
 	return nil
 }
 
-func combineOutput(outputfile string) error {
+func singletoolOutput(toolname string, of *os.File) error {
+
+	results, _ := ioutil.ReadDir("/tmp/results/" + toolname + "/")
+	for _, f := range results {
+		file, err := os.Open("/tmp/results/" + toolname + "/" + f.Name())
+		check(err)
+
+		fi, err := file.Stat()
+		check(err)
+
+		if fi.Size() == 0 {
+			continue
+		} else if fi.Size() > 0 {
+
+			if _, err2 := io.Copy(of, file); err2 != nil {
+				return err2
+			}
+			of.Sync()
+		}
+		defer file.Close()
+	}
+
+	return nil
+}
+
+func combineOutput(toolname string, outputfile string) error {
 	// Read all files in /tmp/results/<tool-name>/ directories for all the tools
 	// open a new file and save it in the output directory - outputFile
 	// for each results file, write user/org and reponame, copy results from the file in the outputFile, end with some delimiter
@@ -282,16 +341,26 @@ func combineOutput(outputfile string) error {
 	of, err := os.Create(outputfile)
 	check(err)
 
-	tools := []string{"thog", "gitsecrets", "repo-supervisor"}
+	switch toolname {
+	case "all":
+		tools := []string{"thog", "gitsecrets", "repo-supervisor"}
 
-	for _, tool := range tools {
-		err = toolOutput(tool, of)
+		for _, tool := range tools {
+			err = toolsOutput(tool, of)
+			check(err)
+		}
+	case "gitsecrets":
+		err = singletoolOutput("gitsecrets", of)
+		check(err)
+	case "thog":
+		err = singletoolOutput("thog", of)
+		check(err)
+	case "repo-supervisor":
+		err = singletoolOutput("repo-supervisor", of)
 		check(err)
 	}
 
 	defer func() {
-		// os.RemoveAll("/tmp/repos/")
-		// os.RemoveAll("/tmp/results/")
 		cerr := of.Close()
 		if err == nil {
 			err = cerr
@@ -307,7 +376,8 @@ func scanorgrepos(org string) error {
 	gitorgrepos, _ := ioutil.ReadDir("/tmp/repos/org/")
 	for _, f := range gitorgrepos {
 		wgorg.Add(1)
-		go runGitTools("/tmp/repos/org/"+f.Name()+"/", &wgorg, f.Name(), org)
+		go runGitTools(*toolName, "/tmp/repos/org/"+f.Name()+"/", &wgorg, f.Name(), org)
+
 	}
 	wgorg.Wait()
 	return nil
@@ -464,15 +534,17 @@ func main() {
 		Info("Starting to scan: " + url + "\n")
 		var wgs sync.WaitGroup
 		wgs.Add(1)
-		go runGitTools(fpath+"/", &wgs, rn, orgoruserName)
+
+		go runGitTools(*toolName, fpath+"/", &wgs, rn, orgoruserName)
+
 		wgs.Wait()
 		Info("Scanning of: " + url + " finished\n")
 
 	}
 
 	//Now, that all the scanning has finished, time to combine the output
-	Info("Combining the output from all the tools into one file\n")
-	err = combineOutput(*outputFile)
+	Info("Combining the output into one file\n")
+	err = combineOutput(*toolName, *outputFile)
 	check(err)
 
 }

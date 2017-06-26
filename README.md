@@ -16,14 +16,15 @@ Scanning is done by multiple open source tools such as:
 * [repo-supervisor](https://github.com/auth0/repo-supervisor) - scans for high entropy strings in .js and .json files
 
 NOTE - More such tools can be added in future, if desired!
+NOTE - Scanning can be done by all the tools or any one of them by specifying the `toolName` flag.
 
-The final output from the tool combines the output from all files from all the tools into one consolidated output file
+If all the tools are used to scan, the final output from the tool combines the output from all files from all the tools into one consolidated output file.
 
 
 ## Getting started
 The easiest way to run `git-all-secrets` is via Docker and I highly recommend installing Docker if you don't already have it. Once you have Docker installed,
-* Type `docker run --rm -it abhartiya/tools_gitallsecrets:v1 --help` to understand the different flags it can take as inputs.
-* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets:v1 -token=<> -org=<>`
+* Type `docker run --rm -it abhartiya/tools_gitallsecrets:v2 --help` to understand the different flags it can take as inputs.
+* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets:v2 -token=<> -org=<>`. You can also specify a particular tool to use for scanning by typing something like `docker run -it abhartiya/tools_gitallsecrets:v2 -token=<> -org=<> -toolName=<>`. Options are `thog`, `repo-supervisor` and `gitsecrets`.
 * After the container finishes running, retrieve the container ID by typing `docker ps -a`.
 * Once you have the container ID, get the results file from the container to the host by typing `docker cp <container-id>:/data/results.txt .`
 
@@ -40,6 +41,8 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -gistURL = HTTPS URL of the Gist to scan. This will scan this gist only.
 * -output = This is the name of the file where all the results will get stored. By default, this is `results.txt`.
 * -cloneForks = This is the optional boolean flag to clone forks of org and user repositories. By default, this is set to `0` i.e. no cloning of forks. If forks are to be cloned, this value needs to be set to `1`.
+* -toolName = This is the optional string flag to specify which tool to use for scanning. By default, this is set to `all` i.e. gitsecrets, thog and repo-supervisor will all be used for scanning.
+
 
 ### Note
 * The `token` flag is compulsory. This can't be empty.
@@ -84,5 +87,6 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
+* 6/25/17 - Added the flag `toolName` to specify which tool to use for scanning. Built and pushed the new image - abhartiya/tools_gitallsecrets:v2
 * 6/14/17 - Added repo-supervisor as a scanning tool, also updated and added the version number to the docker image - abhartiya/tools_gitallsecrets:v1
 * 6/14/17 - Added the flag cloneForks to avoid cloning forks of org and user repos. By default, this is false. If you wish to scan forks, just set the value to 1 i.e. -cloneForks=1
