@@ -23,8 +23,8 @@ If all the tools are used to scan, the final output from the tool combines the o
 
 ## Getting started
 The easiest way to run `git-all-secrets` is via Docker and I highly recommend installing Docker if you don't already have it. Once you have Docker installed,
-* Type `docker run --rm -it abhartiya/tools_gitallsecrets:v2 --help` to understand the different flags it can take as inputs.
-* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets:v2 -token=<> -org=<>`. You can also specify a particular tool to use for scanning by typing something like `docker run -it abhartiya/tools_gitallsecrets:v2 -token=<> -org=<> -toolName=<>`. Options are `thog`, `repo-supervisor` and `gitsecrets`.
+* Type `docker run --rm -it abhartiya/tools_gitallsecrets:v3 --help` to understand the different flags it can take as inputs.
+* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets:v3 -token=<> -org=<>`. You can also specify a particular tool to use for scanning by typing something like `docker run -it abhartiya/tools_gitallsecrets:v3 -token=<> -org=<> -toolName=<>`. Options are `thog`, `repo-supervisor` and `gitsecrets`.
 * After the container finishes running, retrieve the container ID by typing `docker ps -a`.
 * Once you have the container ID, get the results file from the container to the host by typing `docker cp <container-id>:/data/results.txt .`
 
@@ -87,6 +87,7 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
+* 6/26/17 - Removed some output in repo-supevisor that printed out errors when there were no secrets found. Unnecessary output! Built and pushed the new image - abhartiya/tools_gitallsecrets:v3
 * 6/25/17 - Added the flag `toolName` to specify which tool to use for scanning. Built and pushed the new image - abhartiya/tools_gitallsecrets:v2
 * 6/14/17 - Added repo-supervisor as a scanning tool, also updated and added the version number to the docker image - abhartiya/tools_gitallsecrets:v1
 * 6/14/17 - Added the flag cloneForks to avoid cloning forks of org and user repos. By default, this is false. If you wish to scan forks, just set the value to 1 i.e. -cloneForks=1
