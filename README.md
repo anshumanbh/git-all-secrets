@@ -41,6 +41,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -gistURL = HTTPS URL of the Gist to scan. This will scan this gist only.
 * -output = This is the name of the file where all the results will get stored. By default, this is `results.txt`.
 * -cloneForks = This is the optional boolean flag to clone forks of org and user repositories. By default, this is set to `0` i.e. no cloning of forks. If forks are to be cloned, this value needs to be set to `1`.
+* -orgOnly = This is the optional boolean flag to skip cloning user repositories belonging to an org. By default, this is set to `0` i.e. regular behavior. If user repo's are not to be cloned, this value needs to be set to `1`.
 * -toolName = This is the optional string flag to specify which tool to use for scanning. By default, this is set to `all` i.e. gitsecrets, thog and repo-supervisor will all be used for scanning.
 
 
@@ -59,7 +60,7 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 
 
 ## Known Bugs
-* I am aware of a bug with goroutines. This normally happens, when you try to scan a big org with a lot of users who have a lot of repositories. A lot of goroutines are spawned to do the scanning and if the machine is not beefy enough, the goroutines are going to complain. To solve this, the only most practical solution I can think of is to not scan a big org. Maybe, scan in batches. I am open to suggestions here!
+* I am aware of a bug with goroutines. This normally happens, when you try to scan a big org with a lot of users who have a lot of repositories. A lot of goroutines are spawned to do the scanning and if the machine is not beefy enough, the goroutines are going to complain. To solve this, the only most practical solution I can think of is to not scan a big org. Maybe, scan in batches. I am open to suggestions here! Try -orgOnly.
 
 
 ## Details
@@ -87,6 +88,7 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
+* 8/22/17 - Added -orgOnly toggle by kciredor: analyzes specified organization repo and skips user repo's.
 * 6/26/17 - Removed some output in repo-supevisor that printed out errors when there were no secrets found. Unnecessary output! Built and pushed the new image - abhartiya/tools_gitallsecrets:v3
 * 6/25/17 - Added the flag `toolName` to specify which tool to use for scanning. Built and pushed the new image - abhartiya/tools_gitallsecrets:v2
 * 6/14/17 - Added repo-supervisor as a scanning tool, also updated and added the version number to the docker image - abhartiya/tools_gitallsecrets:v1

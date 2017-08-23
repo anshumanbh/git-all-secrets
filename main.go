@@ -27,6 +27,7 @@ var (
 	repoURL    = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
 	gistURL    = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
 	cloneForks = flag.Bool("cloneForks", false, "Option to clone org and user repos that are forks. Default is false")
+	orgOnly    = flag.Bool("orgOnly", false, "Option to skip cloning user repo's when scanning an org. Default is false")
 	toolName   = flag.String("toolName", "all", "Specify whether to run gitsecrets, thog or repo-supervisor")
 )
 
@@ -175,7 +176,7 @@ func cloneusergists(ctx context.Context, client *github.Client, user string) err
 }
 
 func listallusers(ctx context.Context, client *github.Client, org string) ([]*github.User, error) {
-	Info("Users of the organization and their repositories and gists")
+	Info("Listing users of the organization and their repositories and gists")
 	var allUsers []*github.User
 	opt2 := &github.ListMembersOptions{
 		ListOptions: github.ListOptions{PerPage: 10},
@@ -442,7 +443,13 @@ func main() {
 	//By now, we either have the org, user, repoURL or the gistURL. The program flow changes accordingly..
 
 	if *org != "" { //If org was supplied
-		Info("Since org was provided, the tool will proceed to scan all the org repos, then all the user repos and user gists in a recursive manner")
+		m := "Since org was provided, the tool will proceed to scan all the org repos, then all the user repos and user gists in a recursive manner"
+
+		if *orgOnly {
+			m = "Org was specified combined with orgOnly, the tool will proceed to scan all the org repos non-recursively"
+		}
+
+		Info(m)
 
 		//cloning all the repos of the org
 		err := cloneorgrepos(ctx, client, *org)
@@ -452,17 +459,19 @@ func main() {
 		allUsers, err := listallusers(ctx, client, *org)
 		check(err)
 
-		//iterating through the allUsers array
-		for _, user := range allUsers {
+		if !*orgOnly {
+			//iterating through the allUsers array
+			for _, user := range allUsers {
 
-			//cloning all the repos of a user
-			err1 := cloneuserrepos(ctx, client, *user.Login)
-			check(err1)
+				//cloning all the repos of a user
+				err1 := cloneuserrepos(ctx, client, *user.Login)
+				check(err1)
 
-			//cloning all the gists of a user
-			err2 := cloneusergists(ctx, client, *user.Login)
-			check(err2)
+				//cloning all the gists of a user
+				err2 := cloneusergists(ctx, client, *user.Login)
+				check(err2)
 
+			}
 		}
 
 		Info("Scanning all org repositories now..This may take a while so please be patient\n")
@@ -470,14 +479,16 @@ func main() {
 		check(err)
 		Info("Finished scanning all org repositories\n")
 
-		Info("Scanning all user repositories and gists now..This may take a while so please be patient\n")
-		var wguser sync.WaitGroup
-		for _, user := range allUsers {
-			wguser.Add(1)
-			go scanforeachuser(*user.Login, &wguser)
+		if !*orgOnly {
+			Info("Scanning all user repositories and gists now..This may take a while so please be patient\n")
+			var wguser sync.WaitGroup
+			for _, user := range allUsers {
+				wguser.Add(1)
+				go scanforeachuser(*user.Login, &wguser)
+			}
+			wguser.Wait()
+			Info("Finished scanning all user repositories and gists\n")
 		}
-		wguser.Wait()
-		Info("Finished scanning all user repositories and gists\n")
 
 	} else if *user != "" { //If user was supplied
 		Info("Since user was provided, the tool will proceed to scan all the user repos and user gists\n")
