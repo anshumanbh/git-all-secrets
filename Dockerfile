@@ -4,7 +4,7 @@ MAINTAINER Anshuman Bhartiya <anshuman.bhartiya@gmail.com>
 ADD . /data
 WORKDIR /data/thog
 
-RUN apt-get update && apt-get install -y python-pip
+RUN apt-get update && apt-get install -y python-pip jq
 RUN pip install -r requirements.txt
 RUN chmod +x truffleHog/truffleHog.py
 
