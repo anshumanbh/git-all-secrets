@@ -26,6 +26,4 @@ WORKDIR /data
 RUN go get github.com/google/go-github/github && go get github.com/satori/go.uuid && go get golang.org/x/oauth2
 RUN go build -o gitallsecrets .
 
-ENV PATH $PATH:/root/.nvm/versions/node/v7.10.0/bin
-
 ENTRYPOINT ["./gitallsecrets"]
