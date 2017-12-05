@@ -622,7 +622,7 @@ func main() {
 
 	} else if *repoURL != "" || *gistURL != "" { //If either repoURL or gistURL was supplied
 
-		var url, repoorgist, fpath, rn, lastString string
+		var url, repoorgist, fpath, rn, lastString, orgoruserName string
 		var bpath = "/tmp/repos/"
 
 		if *repoURL != "" { //repoURL
@@ -637,7 +637,14 @@ func main() {
 
 		splitArray := strings.Split(url, "/")
 		lastString = splitArray[len(splitArray)-1]
-		orgoruserName := splitArray[3]
+
+		if *protocol == "https" {
+			orgoruserName = splitArray[3]
+		} else {
+			tempstr := splitArray[0]
+			tempstr2 := strings.Split(tempstr, ":")
+			orgoruserName = tempstr2[1]
+		}
 
 		switch repoorgist {
 		case "repo":
