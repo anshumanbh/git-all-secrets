@@ -75,7 +75,7 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 
 
 ## TODO
-* ~~Support scanning Github Enterprise~~ - DONE!
+* Support scanning Github Enterprise
 * ~~Add flag to avoid scanning forks~~ - DONE!
 
 
