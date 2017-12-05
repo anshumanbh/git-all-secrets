@@ -47,6 +47,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -toolName = This is the optional string flag to specify which tool to use for scanning. By default, this is set to `all` i.e. gitsecrets, thog and repo-supervisor will all be used for scanning.
 * -teamName = Name of the Organization Team which has access to private repositories for scanning.
 * -protocol = Which protocol to use when cloning: https or ssh. Default is https.
+* -scanPrivate = This is the optional boolean flag to specify if you want to scan private repositories and gists or not.
 
 
 ### Note
@@ -55,16 +56,17 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * When specifying the `ssh` value to the `protocol` flag: one must mount a volume containing the private SSH key onto the Docker container. Refer to [scanning private repositories](#scanning-private-repositories) below.
  * When specifying `teamName` it is important that the provided `token` belong to a user which is a member of the team. Unexpected results may occur otherwise. Refer to [scanning an organization team](#scanning-an-organization-team) below.
  * Whenever the repourl or gisturl is the `ssh` url, the protocol flag `-protocol ssh` need to be mentioned as well along with the ssh key mounted on the volume.
+ * When you mention the `scanPrivate` flag, you want to make sure the token being used actually belongs to the user whose private repository/gist you are trying to scan otherwise there will be errors.
 
 
 ## Scanning Private Repositories
 The most secure way to scan private repositories is to clone using the SSH URLs. To accomplish this, one needs to place an appropriate SSH key which has been added to a Github User. Github has [helpful documentation](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/) for configuring your account. Once you have the SSH key, simply mount it to the Docker container via a volume. It is as simple as typing the below commands:
 
-`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -org=<> -protocol ssh`
+`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -org=<> -protocol ssh -scanPrivate`
 
 Here, I am mapping my personal SSH key `id_rsa_personal` stored locally to `/root/.ssh/id_rsa` inside the container so when git-all-secrets sees that the mentioned protocol is `ssh`, it will try to clone the repo via `ssh` and will use the SSH key stored at `/root/.ssh/id_rsa`. This way, you are not really storing anything sensitive inside the container. You are just using a file from your local machine. Once the container is destroyed, it no longer has access to this key.
 
-`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -repoURL <ssh-repo-url> -protocol ssh`
+`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -repoURL <ssh-repo-url> -protocol ssh -scanPrivate`
 
 Here, I am trying to scan a particular repo via SSH. This can be a private repo but you need to provide the protocol flag along with the ssh key via a mounted volume.
 

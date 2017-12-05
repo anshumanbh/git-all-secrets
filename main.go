@@ -21,17 +21,18 @@ import (
 )
 
 var (
-	org        = flag.String("org", "", "Name of the Organization to scan. Example: secretorg123")
-	token      = flag.String("token", "", "Github Personal Access Token. This is required.")
-	outputFile = flag.String("output", "results.txt", "Output file to save the results.")
-	user       = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
-	repoURL    = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
-	gistURL    = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
-	cloneForks = flag.Bool("cloneForks", false, "Option to clone org and user repos that are forks. Default is false")
-	orgOnly    = flag.Bool("orgOnly", false, "Option to skip cloning user repo's when scanning an org. Default is false")
-	toolName   = flag.String("toolName", "all", "Specify whether to run gitsecrets, thog or repo-supervisor")
-	protocol   = flag.String("protocol", "https", "Specify which protocol to use when cloning: https or ssh. Defaults to https")
-	teamName   = flag.String("teamName", "", "Name of the Organization Team which has access to private repositories for scanning.")
+	org         = flag.String("org", "", "Name of the Organization to scan. Example: secretorg123")
+	token       = flag.String("token", "", "Github Personal Access Token. This is required.")
+	outputFile  = flag.String("output", "results.txt", "Output file to save the results.")
+	user        = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
+	repoURL     = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
+	gistURL     = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
+	cloneForks  = flag.Bool("cloneForks", false, "Option to clone org and user repos that are forks. Default is false")
+	orgOnly     = flag.Bool("orgOnly", false, "Option to skip cloning user repo's when scanning an org. Default is false")
+	toolName    = flag.String("toolName", "all", "Specify whether to run gitsecrets, thog or repo-supervisor")
+	protocol    = flag.String("protocol", "https", "Specify which protocol to use when cloning: https or ssh. Defaults to https")
+	teamName    = flag.String("teamName", "", "Name of the Organization Team which has access to private repositories for scanning.")
+	scanPrivate = flag.Bool("scanPrivate", false, "Option to scan private repositories & gists. Default is false")
 )
 
 // Info Function to show colored text
@@ -122,13 +123,21 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 func cloneuserrepos(ctx context.Context, client *github.Client, user string) error {
 	Info("Cloning " + user + "'s repositories")
 
+	var uname string
+
+	if *scanPrivate {
+		uname = ""
+	} else {
+		uname = user
+	}
+
 	var userRepos []*github.Repository
 	opt3 := &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{PerPage: 10},
 	}
 
 	for {
-		uRepos, resp, err := client.Repositories.List(ctx, "", opt3)
+		uRepos, resp, err := client.Repositories.List(ctx, uname, opt3)
 		check(err)
 		userRepos = append(userRepos, uRepos...) //adding to the userRepos array
 		if resp.NextPage == 0 {
@@ -152,12 +161,20 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 func cloneusergists(ctx context.Context, client *github.Client, user string) error {
 	Info("Cloning " + user + "'s gists")
 
+	var uname2 string
+
+	if *scanPrivate {
+		uname2 = ""
+	} else {
+		uname2 = user
+	}
+
 	var userGists []*github.Gist
 	opt4 := &github.GistListOptions{
 		ListOptions: github.ListOptions{PerPage: 10},
 	}
 	for {
-		uGists, resp, err := client.Gists.List(ctx, "", opt4)
+		uGists, resp, err := client.Gists.List(ctx, uname2, opt4)
 		check(err)
 		userGists = append(userGists, uGists...)
 		if resp.NextPage == 0 {
