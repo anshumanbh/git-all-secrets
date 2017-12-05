@@ -4,10 +4,10 @@
 
 ## About
 git-all-secrets is a tool that can:
-* Clone multiple public github repositories of an organization and scan them,
-* Clone multiple public github repositories of a user that belongs to an organization and scan them,
-* Clone a single repository of an organization/user and scan it,
-* Clone a single gist of a user and scan it
+* Clone multiple public/private github repositories of an organization and scan them,
+* Clone multiple public/private github repositories of a user that belongs to an organization and scan them,
+* Clone a single public/private repository of an organization/user and scan it,
+* Clone a single public/private gist of a user and scan it
 * Clone a team's repositories in an organization and scan them,
 * All of the above together!! Oh yeah!! Simply provide an organization name and get all their secrets. If you also want to get secrets of a team within an organization, just mention the team name along with the org.
 
