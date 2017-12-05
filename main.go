@@ -128,7 +128,7 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 	}
 
 	for {
-		uRepos, resp, err := client.Repositories.List(ctx, user, opt3)
+		uRepos, resp, err := client.Repositories.List(ctx, "", opt3)
 		check(err)
 		userRepos = append(userRepos, uRepos...) //adding to the userRepos array
 		if resp.NextPage == 0 {
@@ -157,7 +157,7 @@ func cloneusergists(ctx context.Context, client *github.Client, user string) err
 		ListOptions: github.ListOptions{PerPage: 10},
 	}
 	for {
-		uGists, resp, err := client.Gists.List(ctx, user, opt4)
+		uGists, resp, err := client.Gists.List(ctx, "", opt4)
 		check(err)
 		userGists = append(userGists, uGists...)
 		if resp.NextPage == 0 {
