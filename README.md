@@ -54,14 +54,19 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * The `org`, `user`, `repoURL` and `gistURL` can't be all empty at the same time. You need to provide just one of these values. If you provide all of them or multiple values together, the order of precendence will be `org` > `user` > `repoURL` > `gistURL`. For instance, if you provide both the flags `-org=secretorg123` and `-user=secretuser1` together, the tool will complain that it doesn't need anything along with the `org` value. To run it against a particular user only, just need to provide the `user` flag and not the `org` flag.
 * When specifying the `ssh` value to the `protocol` flag: one must mount a volume containing the private SSH key onto the Docker container. Refer to [scanning private repositories](#scanning-private-repositories) below.
  * When specifying `teamName` it is important that the provided `token` belong to a user which is a member of the team. Unexpected results may occur otherwise. Refer to [scanning an organization team](#scanning-an-organization-team) below.
+ * Whenever the repourl or gisturl is the `ssh` url, the protocol flag `-protocol ssh` need to be mentioned as well along with the ssh key mounted on the volume.
 
 
 ## Scanning Private Repositories
-The most secure way to scan private repositories is to clone using the SSH URLs. To accomplish this, one needs to place an appropriate SSH key which has been added to a Github User. Github has [helpful documentation](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/) for configuring your account. Once you have the SSH key, simply mount it to the Docker container via a volume. It is as simple as typing the below command:
+The most secure way to scan private repositories is to clone using the SSH URLs. To accomplish this, one needs to place an appropriate SSH key which has been added to a Github User. Github has [helpful documentation](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/) for configuring your account. Once you have the SSH key, simply mount it to the Docker container via a volume. It is as simple as typing the below commands:
 
 `docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -org=<> -protocol ssh`
 
 Here, I am mapping my personal SSH key `id_rsa_personal` stored locally to `/root/.ssh/id_rsa` inside the container so when git-all-secrets sees that the mentioned protocol is `ssh`, it will try to clone the repo via `ssh` and will use the SSH key stored at `/root/.ssh/id_rsa`. This way, you are not really storing anything sensitive inside the container. You are just using a file from your local machine. Once the container is destroyed, it no longer has access to this key.
+
+`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -repoURL <ssh-repo-url> -protocol ssh`
+
+Here, I am trying to scan a particular repo via SSH. This can be a private repo but you need to provide the protocol flag along with the ssh key via a mounted volume.
 
 
 ## Scanning an Organization Team
@@ -76,6 +81,7 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 
 ## TODO
 * Support scanning Github Enterprise
+* ~~Add support for scanning private repositories via SSH keys~~ - DONE!
 * ~~Add flag to avoid scanning forks~~ - DONE!
 
 
@@ -110,12 +116,20 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
-* 12/05/17 - Integrated scanning support for private repositories via SSH key. This has been an ask for the longest time and it is now possible to do so. Also, changed the docker image tag scheme. From now on, the latest image will have the `latest` tag. And, all the previous versions will be tagged with a number. All this couldn't have been possible without the `SimpliSafe` team, specially Matthew Cox (https://github.com/matthew-cox). So, a big shoutout to you Matt!
+* 12/05/17 - Integrated scanning support for private repositories via SSH key. This has been an ask for the longest time and it is now possible to do so. Also, changed the docker image tag scheme. From now on, the latest image will have the `latest` tag. And, all the previous versions will be tagged with a number. All this couldn't have been possible without the `SimpliSafe` team, specially Matthew Cox (https://github.com/matthew-cox). So, a big shoutout to you Matt! Also added support for scanning single private repo/gist via SSH key.
+
 * 10/14/17 - Built and pushed the new image abhartiya/tools_gitallsecrets:v6. This new image has the newer version of `git-secrets` as well as `repo-supervisor` i.e. I merged some upstream changes into my fork alongwith some additional changes I had already made in my fork. The new image uses these changes so everything is latest and greatest!
+
 * 10/14/17 - Built and pushed the new image abhartiya/tools_gitallsecrets:v5. This image fixes a very stupid and irritating bug which was possibly causing repo supervisor to fail. Something changed in the way Environment values are being read in Dockerfile which resulted in repo supervisor not understanding which node path to use. Node hell!
+
 * 9/29/17 - Built and pushed the new image with the `orgOnly` flag - abhartiya/tools_gitallsecrets:v4
+
 * 8/22/17 - Added -orgOnly toggle by kciredor: analyzes specified organization repo and skips user repo's.
+
 * 6/26/17 - Removed some output in repo-supevisor that printed out errors when there were no secrets found. Unnecessary output! Built and pushed the new image - abhartiya/tools_gitallsecrets:v3
+
 * 6/25/17 - Added the flag `toolName` to specify which tool to use for scanning. Built and pushed the new image - abhartiya/tools_gitallsecrets:v2
+
 * 6/14/17 - Added repo-supervisor as a scanning tool, also updated and added the version number to the docker image - abhartiya/tools_gitallsecrets:v1
+
 * 6/14/17 - Added the flag cloneForks to avoid cloning forks of org and user repos. By default, this is false. If you wish to scan forks, just set the value to 1 i.e. -cloneForks=1
