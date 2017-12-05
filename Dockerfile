@@ -8,6 +8,14 @@ RUN apt-get update && apt-get install -y python-pip jq
 RUN pip install -r requirements.txt
 RUN chmod +x truffleHog/truffleHog.py
 
+# create a generic SSH config for Github
+WORKDIR /root/.ssh
+RUN echo "Host *github.com \
+\n  IdentitiesOnly yes \
+\n  StrictHostKeyChecking no \
+\n  UserKnownHostsFile=/dev/null \
+\n  IdentityFile /root/.ssh/id_rsa" > config
+
 WORKDIR /data
 RUN chmod +x rungitsecrets.sh
 RUN chmod +x runreposupervisor.sh

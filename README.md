@@ -8,7 +8,8 @@ git-all-secrets is a tool that can:
 * Clone multiple public github repositories of a user that belongs to an organization and scan them,
 * Clone a single repository of an organization/user and scan it,
 * Clone a single gist of a user and scan it
-* All of the above together!! Oh yeah!! Simply provide an organization name and get all their secrets.
+* Clone a team's repositories in an organization and scan them,
+* All of the above together!! Oh yeah!! Simply provide an organization name and get all their secrets. If you also want to get secrets of a team within an organization, just mention the team name along with the org.
 
 Scanning is done by multiple open source tools such as:
 * [truffleHog](https://github.com/dxa4481/truffleHog) - scans commits for high entropy strings,
@@ -23,10 +24,11 @@ If all the tools are used to scan, the final output from the tool combines the o
 
 ## Getting started
 The easiest way to run `git-all-secrets` is via Docker and I highly recommend installing Docker if you don't already have it. Once you have Docker installed,
-* Type `docker run --rm -it abhartiya/tools_gitallsecrets:v6 --help` to understand the different flags it can take as inputs.
-* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets:v6 -token=<> -org=<>`. You can also specify a particular tool to use for scanning by typing something like `docker run -it abhartiya/tools_gitallsecrets:v6 -token=<> -org=<> -toolName=<>`. Options are `thog`, `repo-supervisor` and `gitsecrets`.
+* Type `docker run --rm -it abhartiya/tools_gitallsecrets --help` to understand the different flags it can take as inputs.
+* Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets -token=<> -org=<>`. You can also specify a particular tool to use for scanning by typing something like `docker run -it abhartiya/tools_gitallsecrets -token=<> -org=<> -toolName=<>`. Options are `thog`, `repo-supervisor` and `gitsecrets`.
 * After the container finishes running, retrieve the container ID by typing `docker ps -a`.
 * Once you have the container ID, get the results file from the container to the host by typing `docker cp <container-id>:/data/results.txt .`
+* If you want to scan a team in an org, you need the org name but you don't want to mention the `orgOnly` flag so type something like `docker run -it abhartiya/tools_gitallsecrets -token=<> -org=<> -teamName=<>`
 
 PS - Since I am going to keep adding more tools, supporting non-Docker running instructions is likely not going to happen! For instance, I just added the `repo-supervisor` tool to scan and setting it up was the biggest PITA ever. How much have I started to hate node and npm and nvm and blah..!
 
@@ -43,11 +45,29 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -cloneForks = This is the optional boolean flag to clone forks of org and user repositories. By default, this is set to `0` i.e. no cloning of forks. If forks are to be cloned, this value needs to be set to `1`.
 * -orgOnly = This is the optional boolean flag to skip cloning user repositories belonging to an org. By default, this is set to `0` i.e. regular behavior. If user repo's are not to be cloned, this value needs to be set to `1`.
 * -toolName = This is the optional string flag to specify which tool to use for scanning. By default, this is set to `all` i.e. gitsecrets, thog and repo-supervisor will all be used for scanning.
+* -teamName = Name of the Organization Team which has access to private repositories for scanning.
+* -protocol = Which protocol to use when cloning: https or ssh. Default is https.
 
 
 ### Note
 * The `token` flag is compulsory. This can't be empty.
 * The `org`, `user`, `repoURL` and `gistURL` can't be all empty at the same time. You need to provide just one of these values. If you provide all of them or multiple values together, the order of precendence will be `org` > `user` > `repoURL` > `gistURL`. For instance, if you provide both the flags `-org=secretorg123` and `-user=secretuser1` together, the tool will complain that it doesn't need anything along with the `org` value. To run it against a particular user only, just need to provide the `user` flag and not the `org` flag.
+* When specifying the `ssh` value to the `protocol` flag: one must mount a volume containing the private SSH key onto the Docker container. Refer to [scanning private repositories](#scanning-private-repositories) below.
+ * When specifying `teamName` it is important that the provided `token` belong to a user which is a member of the team. Unexpected results may occur otherwise. Refer to [scanning an organization team](#scanning-an-organization-team) below.
+
+
+## Scanning Private Repositories
+The most secure way to scan private repositories is to clone using the SSH URLs. To accomplish this, one needs to place an appropriate SSH key which has been added to a Github User. Github has [helpful documentation](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/) for configuring your account. Once you have the SSH key, simply mount it to the Docker container via a volume. It is as simple as typing the below command:
+
+`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -org=<> -protocol ssh`
+
+Here, I am mapping my personal SSH key `id_rsa_personal` stored locally to `/root/.ssh/id_rsa` inside the container so when git-all-secrets sees that the mentioned protocol is `ssh`, it will try to clone the repo via `ssh` and will use the SSH key stored at `/root/.ssh/id_rsa`. This way, you are not really storing anything sensitive inside the container. You are just using a file from your local machine. Once the container is destroyed, it no longer has access to this key.
+
+
+## Scanning an Organization Team
+The Github API limits the circumstances where a private repository is reported. If one is trying to scan an Organization with a user which is not an admin, you may need to provide the team which provides repository access to the user. In order to do this, use the `teamName` flag along with the `org` flag. Example is below:
+
+`docker run --it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -org=<> -protocol ssh -teamName read-only`
 
 
 ## Demo
@@ -55,7 +75,7 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 
 
 ## TODO
-* Support scanning Github Enterprise
+* ~~Support scanning Github Enterprise~~ - DONE!
 * ~~Add flag to avoid scanning forks~~ - DONE!
 
 
@@ -72,6 +92,8 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 * It is built for integration with other tools and frameworks. It takes in a few input parameters and produces an output file of the results. Pretty straightforward!
 * If there are new patterns that need to be added, adding those is pretty easy as well. Take a look at the file `rungitsecrets.sh` and check how the `xoxp-` and `xoxb-` patterns were added.
 * It uses truffleHog and git-secrets with some modifications to their codebase to make the output much better. `truffleHog` doesn't output the results to a file so that has been added. `git-secrets` has a lot of unnecessary output even when no secret is found so some of that output is removed for better readability.
+* It can be used to scan private repositories (personal or organization) by providing the SSH key.
+* It can be used to scan team repositories belonging to an organization.
 
 ### Motivation
 I looked at a large number of open source tools that could be potentially used to look for secrets in github repositories. Some of the top tools that I thought were good are: [gitrob](https://github.com/michenriksen/gitrob), [truffleHog](https://github.com/dxa4481/truffleHog) and [git-secrets](https://github.com/awslabs/git-secrets).
@@ -88,6 +110,7 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
+* 12/05/17 - Integrated scanning support for private repositories via SSH key. This has been an ask for the longest time and it is now possible to do so. Also, changed the docker image tag scheme. From now on, the latest image will have the `latest` tag. And, all the previous versions will be tagged with a number. All this couldn't have been possible without the `SimpliSafe` team, specially Matthew Cox (https://github.com/matthew-cox). So, a big shoutout to you Matt!
 * 10/14/17 - Built and pushed the new image abhartiya/tools_gitallsecrets:v6. This new image has the newer version of `git-secrets` as well as `repo-supervisor` i.e. I merged some upstream changes into my fork alongwith some additional changes I had already made in my fork. The new image uses these changes so everything is latest and greatest!
 * 10/14/17 - Built and pushed the new image abhartiya/tools_gitallsecrets:v5. This image fixes a very stupid and irritating bug which was possibly causing repo supervisor to fail. Something changed in the way Environment values are being read in Dockerfile which resulted in repo supervisor not understanding which node path to use. Node hell!
 * 9/29/17 - Built and pushed the new image with the `orgOnly` flag - abhartiya/tools_gitallsecrets:v4
