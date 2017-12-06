@@ -47,7 +47,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -orgOnly = This is the optional boolean flag to skip cloning user repositories belonging to an org. By default, this is set to `0` i.e. regular behavior. If user repo's are not to be cloned, this value needs to be set to `1`.
 * -toolName = This is the optional string flag to specify which tool to use for scanning. By default, this is set to `all` i.e. gitsecrets, thog and repo-supervisor will all be used for scanning.
 * -teamName = Name of the Organization Team which has access to private repositories for scanning.
-* -scanPrivate = This is the optional boolean flag to specify if you want to scan private repositories or not.
+* -scanPrivateReposOnly = This is the optional boolean flag to specify if you want to scan private repositories or not. It will not scan public repositories.
 
 
 ### Note
@@ -55,31 +55,31 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 
 * The `org`, `user`, `repoURL` and `gistURL` can't be all empty at the same time. You need to provide just one of these values. If you provide all of them or multiple values together, the order of precendence will be `org` > `user` > `repoURL` > `gistURL`. For instance, if you provide both the flags `-org=secretorg123` and `-user=secretuser1` together, the tool will complain that it doesn't need anything along with the `org` value. To run it against a particular user only, just need to provide the `user` flag and not the `org` flag.
 
-* When specifying `scanPrivate` flag, one must mount a volume containing the private SSH key onto the Docker container. Refer to [scanning private repositories](#scanning-private-repositories) below.
+* When specifying `scanPrivateReposOnly` flag, one must mount a volume containing the private SSH key onto the Docker container. Refer to [scanning private repositories](#scanning-private-repositories) below.
 
 * When specifying `teamName` it is important that the provided `token` belong to a user which is a member of the team. Unexpected results may occur otherwise. Refer to [scanning an organization team](#scanning-an-organization-team) below.
 
-* When you mention the `scanPrivate` flag, you want to make sure the token being used actually belongs to the user whose private repository/gist you are trying to scan otherwise there will be errors.
+* When you mention the `scanPrivateReposOnly` flag, you want to make sure the token being used actually belongs to the user whose private repository/gist you are trying to scan otherwise there will be errors.
 
 * The SSH key that you will be using should not have a passphrase set if you want this tool to work without any manual intervention.
 
 * The tool works against the `api.github.com` domain only as of now. Support for Github Enterprise is being worked on.
 
-* If you want to scan secret gists, you don't have to mention the `scanPrivate` flag. Just use your token and it should work. This is because the Github API v3 deals differently when it comes to cloning gists and cloning repositories.
+* If you want to scan secret gists, you don't have to mention the `scanPrivateReposOnly` flag. Just use your token and it should work. This is because the Github API v3 deals differently when it comes to cloning gists and cloning repositories.
 
-* `scanPrivate` flag should be used anytime a private repository is scanned. Please use the `git` url when using the flag. Otherwise, it will complain.
+* `scanPrivateReposOnly` flag should be used anytime a private repository is scanned. Please use the `git` url when using the flag. Otherwise, it will complain.
 
-* Providing `scanPrivate` flag will scan public AND private repositories.
+* Providing `scanPrivateReposOnly` flag will only scan private repositories.
 
 
 ## Scanning Private Repositories
 The most secure way to scan private repositories is to clone using the SSH URLs. To accomplish this, one needs to place an appropriate SSH key which has been added to a Github User. Github has [helpful documentation](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/) for configuring your account. Once you have the SSH key, simply mount it to the Docker container via a volume. It is as simple as typing the below commands:
 
-`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -user=<> -scanPrivate`
+`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -user=<> -scanPrivateReposOnly`
 
 OR
 
-`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -repoURL=<> -scanPrivate`
+`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -repoURL=<> -scanPrivateReposOnly`
 
 Here, I am mapping my personal SSH key `id_rsa_personal` stored locally to `/root/.ssh/id_rsa` inside the container so when git-all-secrets sees that the mentioned protocol is `ssh`, it will try to clone the repo via `ssh` and will use the SSH key stored at `/root/.ssh/id_rsa`. This way, you are not really storing anything sensitive inside the container. You are just using a file from your local machine. Once the container is destroyed, it no longer has access to this key.
 

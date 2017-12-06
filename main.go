@@ -21,17 +21,17 @@ import (
 )
 
 var (
-	org         = flag.String("org", "", "Name of the Organization to scan. Example: secretorg123")
-	token       = flag.String("token", "", "Github Personal Access Token. This is required.")
-	outputFile  = flag.String("output", "results.txt", "Output file to save the results.")
-	user        = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
-	repoURL     = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
-	gistURL     = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
-	cloneForks  = flag.Bool("cloneForks", false, "Option to clone org and user repos that are forks. Default is false")
-	orgOnly     = flag.Bool("orgOnly", false, "Option to skip cloning user repo's when scanning an org. Default is false")
-	toolName    = flag.String("toolName", "all", "Specify whether to run gitsecrets, thog or repo-supervisor")
-	teamName    = flag.String("teamName", "", "Name of the Organization Team which has access to private repositories for scanning.")
-	scanPrivate = flag.Bool("scanPrivate", false, "Option to scan private repositories. Default is false")
+	org                  = flag.String("org", "", "Name of the Organization to scan. Example: secretorg123")
+	token                = flag.String("token", "", "Github Personal Access Token. This is required.")
+	outputFile           = flag.String("output", "results.txt", "Output file to save the results.")
+	user                 = flag.String("user", "", "Name of the Github user to scan. Example: secretuser1")
+	repoURL              = flag.String("repoURL", "", "HTTPS URL of the Github repo to scan. Example: https://github.com/anshumantestorg/repo1.git")
+	gistURL              = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
+	cloneForks           = flag.Bool("cloneForks", false, "Option to clone org and user repos that are forks. Default is false")
+	orgOnly              = flag.Bool("orgOnly", false, "Option to skip cloning user repo's when scanning an org. Default is false")
+	toolName             = flag.String("toolName", "all", "Specify whether to run gitsecrets, thog or repo-supervisor")
+	teamName             = flag.String("teamName", "", "Name of the Organization Team which has access to private repositories for scanning.")
+	scanPrivateReposOnly = flag.Bool("scanPrivateReposOnly", false, "Option to scan private repositories only. Default is false")
 )
 
 // Info Function to show colored text
@@ -61,7 +61,7 @@ func gitclone(cloneURL string, repoName string, wg *sync.WaitGroup) {
 // Moving cloning logic out of individual functions
 func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup) {
 	urlToClone := ""
-	switch *scanPrivate {
+	switch *scanPrivateReposOnly {
 	case false:
 		urlToClone = *repo.CloneURL
 	case true:
@@ -122,16 +122,20 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 	Info("Cloning " + user + "'s repositories")
 
 	var uname string
+	var userRepos []*github.Repository
+	var opt3 *github.RepositoryListOptions
 
-	if *scanPrivate {
+	if *scanPrivateReposOnly {
 		uname = ""
+		opt3 = &github.RepositoryListOptions{
+			Visibility:  "private",
+			ListOptions: github.ListOptions{PerPage: 10},
+		}
 	} else {
 		uname = user
-	}
-
-	var userRepos []*github.Repository
-	opt3 := &github.RepositoryListOptions{
-		ListOptions: github.ListOptions{PerPage: 10},
+		opt3 = &github.RepositoryListOptions{
+			ListOptions: github.ListOptions{PerPage: 10},
+		}
 	}
 
 	for {
@@ -161,7 +165,7 @@ func cloneusergists(ctx context.Context, client *github.Client, user string) err
 
 	var uname2 string
 
-	if *scanPrivate {
+	if *scanPrivateReposOnly {
 		uname2 = ""
 	} else {
 		uname2 = user
@@ -421,7 +425,7 @@ func stringInSlice(a string, list []*github.Repository) (bool, error) {
 	return false, nil
 }
 
-func checkflags(token string, org string, user string, repoURL string, gistURL string, teamName string, scanPrivate bool, orgOnly bool) error {
+func checkflags(token string, org string, user string, repoURL string, gistURL string, teamName string, scanPrivateReposOnly bool, orgOnly bool) error {
 	if token == "" {
 		fmt.Println("Need a Github personal access token. Please provide that using the -token flag")
 		os.Exit(2)
@@ -446,11 +450,11 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 	} else if orgOnly && org == "" {
 		fmt.Println("orgOnly flag should be used with a valid org")
 		os.Exit(2)
-	} else if scanPrivate && user == "" && repoURL == "" {
-		fmt.Println("scanPrivate flag should be used along with either the user or the repoURL")
+	} else if scanPrivateReposOnly && user == "" && repoURL == "" {
+		fmt.Println("scanPrivateReposOnly flag should be used along with either the user or the repoURL")
 		os.Exit(2)
-	} else if scanPrivate && (user != "" || repoURL != "") {
-		fmt.Println("scanPrivate flag is provided with either the user or the repoURL")
+	} else if scanPrivateReposOnly && (user != "" || repoURL != "") {
+		fmt.Println("scanPrivateReposOnly flag is provided with either the user or the repoURL")
 		fmt.Println("Checking to see if the SSH key exists or not..")
 
 		fi, err := os.Stat("/root/.ssh/id_rsa")
@@ -487,7 +491,7 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 		}
 
 		if user != "" {
-			fmt.Println("scanPrivate flag is provided along with the user")
+			fmt.Println("scanPrivateReposOnly flag is provided along with the user")
 			fmt.Println("Checking to see if the token provided belongs to the user or not..")
 
 			if *userRepos[0].Owner.Login == user {
@@ -498,7 +502,7 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 			}
 
 		} else if repoURL != "" {
-			fmt.Println("scanPrivate flag is provided along with the repoURL")
+			fmt.Println("scanPrivateReposOnly flag is provided along with the repoURL")
 			fmt.Println("Checking to see if the repo provided belongs to the user or not..")
 			val, err := stringInSlice(repoURL, userRepos)
 			check(err)
@@ -510,8 +514,8 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 			}
 		}
 
-	} else if scanPrivate && (org != "" || gistURL != "") {
-		fmt.Println("scanPrivate flag should not be provided with either the org or the gistURL since its a private repository or multiple private repositories that we are looking to scan. Please provide either a user or a private repoURL")
+	} else if scanPrivateReposOnly && (org != "" || gistURL != "") {
+		fmt.Println("scanPrivateReposOnly flag should not be provided with either the org or the gistURL since its a private repository or multiple private repositories that we are looking to scan. Please provide either a user or a private repoURL")
 		os.Exit(2)
 	}
 
@@ -611,7 +615,7 @@ func main() {
 	flag.Parse()
 
 	//Logic to check the program is ingesting proper flags
-	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *teamName, *scanPrivate, *orgOnly)
+	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *teamName, *scanPrivateReposOnly, *orgOnly)
 	check(err)
 
 	//Authenticating to Github using the token
@@ -728,7 +732,7 @@ func main() {
 		splitArray := strings.Split(url, "/")
 		lastString = splitArray[len(splitArray)-1]
 
-		if !*scanPrivate {
+		if !*scanPrivateReposOnly {
 			orgoruserName = splitArray[3]
 		} else {
 			tempstr := splitArray[0]
