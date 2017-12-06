@@ -4,10 +4,11 @@
 
 ## About
 git-all-secrets is a tool that can:
-* Clone multiple public/private github repositories of an organization and scan them,
+* Clone multiple public github repositories of an organization and scan them,
 * Clone multiple public/private github repositories of a user that belongs to an organization and scan them,
-* Clone a single public/private repository of an organization/user and scan it,
-* Clone a single public/private gist of a user and scan it
+* Clone a single public repository of an organization and scan it,
+* Clone a single public/private repository of a user and scan it,
+* Clone a single public/secret gist of a user and scan it
 * Clone a team's repositories in an organization and scan them,
 * All of the above together!! Oh yeah!! Simply provide an organization name and get all their secrets. If you also want to get secrets of a team within an organization, just mention the team name along with the org.
 
@@ -46,29 +47,31 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 * -orgOnly = This is the optional boolean flag to skip cloning user repositories belonging to an org. By default, this is set to `0` i.e. regular behavior. If user repo's are not to be cloned, this value needs to be set to `1`.
 * -toolName = This is the optional string flag to specify which tool to use for scanning. By default, this is set to `all` i.e. gitsecrets, thog and repo-supervisor will all be used for scanning.
 * -teamName = Name of the Organization Team which has access to private repositories for scanning.
-* -protocol = Which protocol to use when cloning: https or ssh. Default is https.
-* -scanPrivate = This is the optional boolean flag to specify if you want to scan private repositories and gists or not.
+* -scanPrivate = This is the optional boolean flag to specify if you want to scan private repositories or not.
 
 
 ### Note
 * The `token` flag is compulsory. This can't be empty.
 * The `org`, `user`, `repoURL` and `gistURL` can't be all empty at the same time. You need to provide just one of these values. If you provide all of them or multiple values together, the order of precendence will be `org` > `user` > `repoURL` > `gistURL`. For instance, if you provide both the flags `-org=secretorg123` and `-user=secretuser1` together, the tool will complain that it doesn't need anything along with the `org` value. To run it against a particular user only, just need to provide the `user` flag and not the `org` flag.
-* When specifying the `ssh` value to the `protocol` flag: one must mount a volume containing the private SSH key onto the Docker container. Refer to [scanning private repositories](#scanning-private-repositories) below.
- * When specifying `teamName` it is important that the provided `token` belong to a user which is a member of the team. Unexpected results may occur otherwise. Refer to [scanning an organization team](#scanning-an-organization-team) below.
- * Whenever the repourl or gisturl is the `ssh` url, the protocol flag `-protocol ssh` need to be mentioned as well along with the ssh key mounted on the volume.
- * When you mention the `scanPrivate` flag, you want to make sure the token being used actually belongs to the user whose private repository/gist you are trying to scan otherwise there will be errors.
+* When specifying `scanPrivate` flag, one must mount a volume containing the private SSH key onto the Docker container. Refer to [scanning private repositories](#scanning-private-repositories) below.
+* When specifying `teamName` it is important that the provided `token` belong to a user which is a member of the team. Unexpected results may occur otherwise. Refer to [scanning an organization team](#scanning-an-organization-team) below.
+* When you mention the `scanPrivate` flag, you want to make sure the token being used actually belongs to the user whose private repository/gist you are trying to scan otherwise there will be errors.
+* The SSH key that you will be using should not have a passphrase set if you want this tool to work without any manual intervention.
+* The tool works against the `api.github.com` domain only as of now. Support for Github Enterprise is being worked on.
+* If you want to scan secret gists, you don't have to mention the `scanPrivate` flag. Just use your token and it should work. This is because the Github API v3 deals differently when it comes to cloning gists and cloning repositories.
+* `scanPrivate` flag should be used anytime a private repository is scanned.
 
 
 ## Scanning Private Repositories
 The most secure way to scan private repositories is to clone using the SSH URLs. To accomplish this, one needs to place an appropriate SSH key which has been added to a Github User. Github has [helpful documentation](https://help.github.com/articles/adding-a-new-ssh-key-to-your-github-account/) for configuring your account. Once you have the SSH key, simply mount it to the Docker container via a volume. It is as simple as typing the below commands:
 
-`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -org=<> -protocol ssh -scanPrivate`
+`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -user=<> -scanPrivate`
+
+OR
+
+`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -repoURL=<> -scanPrivate`
 
 Here, I am mapping my personal SSH key `id_rsa_personal` stored locally to `/root/.ssh/id_rsa` inside the container so when git-all-secrets sees that the mentioned protocol is `ssh`, it will try to clone the repo via `ssh` and will use the SSH key stored at `/root/.ssh/id_rsa`. This way, you are not really storing anything sensitive inside the container. You are just using a file from your local machine. Once the container is destroyed, it no longer has access to this key.
-
-`docker run -it -v ~/.ssh/id_rsa_personal:/root/.ssh/id_rsa abhartiya/tools_gitallsecrets -token=<> -repoURL <ssh-repo-url> -protocol ssh -scanPrivate`
-
-Here, I am trying to scan a particular repo via SSH. This can be a private repo but you need to provide the protocol flag along with the ssh key via a mounted volume.
 
 
 ## Scanning an Organization Team
@@ -118,7 +121,7 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
-* 12/05/17 - Integrated scanning support for private repositories via SSH key. This has been an ask for the longest time and it is now possible to do so. Also, changed the docker image tag scheme. From now on, the latest image will have the `latest` tag. And, all the previous versions will be tagged with a number. All this couldn't have been possible without the `SimpliSafe` team, specially Matthew Cox (https://github.com/matthew-cox). So, a big shoutout to you Matt! Also added support for scanning single private repo/gist via SSH key.
+* 12/05/17 - Integrated scanning support for private repositories via SSH key. This has been an ask for the longest time and it is now possible to do so. Also, changed the docker image tag scheme. From now on, the latest image will have the `latest` tag. And, all the previous versions will be tagged with a number. All this couldn't have been possible without the `SimpliSafe` team, specially Matthew Cox (https://github.com/matthew-cox). So, a big shoutout to you Matt! Also added support for scanning single private repo(s) via SSH key.
 
 * 10/14/17 - Built and pushed the new image abhartiya/tools_gitallsecrets:v6. This new image has the newer version of `git-secrets` as well as `repo-supervisor` i.e. I merged some upstream changes into my fork alongwith some additional changes I had already made in my fork. The new image uses these changes so everything is latest and greatest!
 
