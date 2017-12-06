@@ -67,7 +67,7 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 
 * If you want to scan secret gists, you don't have to mention the `scanPrivate` flag. Just use your token and it should work. This is because the Github API v3 deals differently when it comes to cloning gists and cloning repositories.
 
-* `scanPrivate` flag should be used anytime a private repository is scanned.
+* `scanPrivate` flag should be used anytime a private repository is scanned. Please use the `git` url when using the flag. Otherwise, it will complain.
 
 * Providing `scanPrivate` flag will scan public AND private repositories.
 
