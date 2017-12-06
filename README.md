@@ -52,14 +52,24 @@ In other words, if you wish to use `git-all-secrets`, please use Docker! I have 
 
 ### Note
 * The `token` flag is compulsory. This can't be empty.
+
 * The `org`, `user`, `repoURL` and `gistURL` can't be all empty at the same time. You need to provide just one of these values. If you provide all of them or multiple values together, the order of precendence will be `org` > `user` > `repoURL` > `gistURL`. For instance, if you provide both the flags `-org=secretorg123` and `-user=secretuser1` together, the tool will complain that it doesn't need anything along with the `org` value. To run it against a particular user only, just need to provide the `user` flag and not the `org` flag.
+
 * When specifying `scanPrivate` flag, one must mount a volume containing the private SSH key onto the Docker container. Refer to [scanning private repositories](#scanning-private-repositories) below.
+
 * When specifying `teamName` it is important that the provided `token` belong to a user which is a member of the team. Unexpected results may occur otherwise. Refer to [scanning an organization team](#scanning-an-organization-team) below.
+
 * When you mention the `scanPrivate` flag, you want to make sure the token being used actually belongs to the user whose private repository/gist you are trying to scan otherwise there will be errors.
+
 * The SSH key that you will be using should not have a passphrase set if you want this tool to work without any manual intervention.
+
 * The tool works against the `api.github.com` domain only as of now. Support for Github Enterprise is being worked on.
+
 * If you want to scan secret gists, you don't have to mention the `scanPrivate` flag. Just use your token and it should work. This is because the Github API v3 deals differently when it comes to cloning gists and cloning repositories.
+
 * `scanPrivate` flag should be used anytime a private repository is scanned.
+
+* Providing `scanPrivate` flag will scan public AND private repositories.
 
 
 ## Scanning Private Repositories
