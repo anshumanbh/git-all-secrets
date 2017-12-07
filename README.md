@@ -141,7 +141,7 @@ So, as you can see, there are decent tools out there, but they had to be combine
 ### Changelog
 * 12/07/17 - I updated the documentation with some more details and explanation around the different flags.
 
-* 12/05/17 - Integrated scanning support for private repositories via SSH key. This has been an ask for the longest time and it is now possible to do so. Also, changed the docker image tag scheme. From now on, the latest image will have the `latest` tag. And, all the previous versions will be tagged with a number. All this couldn't have been possible without the `SimpliSafe` team, specially Matthew Cox (https://github.com/matthew-cox). So, a big shoutout to you Matt! Also added support for scanning single private repo(s) via SSH key.
+* 12/05/17 - Integrated scanning support for private repositories via SSH key. This has been an ask for the longest time and it is now possible to do so. Also, changed the docker image tag scheme. From now on, the latest image will have the `latest` tag. And, all the previous versions will be tagged with a number. All this couldn't have been possible without the `SimpliSafe` team, specially Matthew Cox (https://github.com/matthew-cox). So, a big shoutout to you Matt!
 
 * 10/14/17 - Built and pushed the new image abhartiya/tools_gitallsecrets:v6. This new image has the newer version of `git-secrets` as well as `repo-supervisor` i.e. I merged some upstream changes into my fork alongwith some additional changes I had already made in my fork. The new image uses these changes so everything is latest and greatest!
 
