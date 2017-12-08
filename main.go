@@ -232,9 +232,17 @@ func runGitsecrets(filepath string, reponame string, orgoruser string) error {
 
 func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	outputFile1 := "/tmp/results/thog/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
-	cmd1 := exec.Command("./thog/truffleHog/truffleHog.py", "-o", outputFile1, filepath)
-	var out1 bytes.Buffer
-	cmd1.Stdout = &out1
+
+	// open the out file for writing
+	outfile, fileErr := os.OpenFile(outputFile1, os.O_CREATE|os.O_RDWR, 0644)
+	check(fileErr)
+	defer outfile.Close()
+
+	cmd1 := exec.Command("python", "./truffleHog/truffleHog/truffleHog.py", "--regex", "--entropy=True", filepath)
+
+	// direct stdout to the outfile
+	cmd1.Stdout = outfile
+
 	err1 := cmd1.Run()
 	check(err1)
 	return nil
@@ -425,7 +433,7 @@ func stringInSlice(a string, list []*github.Repository) (bool, error) {
 	return false, nil
 }
 
-func checkflags(token string, org string, user string, repoURL string, gistURL string, teamName string, scanPrivateReposOnly bool, orgOnly bool) error {
+func checkflags(token string, org string, user string, repoURL string, gistURL string, teamName string, scanPrivateReposOnly bool, orgOnly bool, toolName string) error {
 	if token == "" {
 		fmt.Println("Need a Github personal access token. Please provide that using the -token flag")
 		os.Exit(2)
@@ -517,6 +525,14 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 	} else if scanPrivateReposOnly && (org != "" || gistURL != "") {
 		fmt.Println("scanPrivateReposOnly flag should not be provided with either the org or the gistURL since its a private repository or multiple private repositories that we are looking to scan. Please provide either a user or a private repoURL")
 		os.Exit(2)
+	} else if !(toolName == "thog" || toolName == "gitsecrets" || toolName == "repo-supervisor" || toolName == "all") {
+		fmt.Println("Please enter either thog, gitsecrets, repo-supervisor or all.")
+		os.Exit(2)
+	} else if repoURL != "" && !scanPrivateReposOnly {
+		if strings.Split(repoURL, "@")[0] == "git" {
+			fmt.Println("Since the repoURL is a SSH URL, it is required to have the scanPrivateReposOnly flag and the SSH key mounted on a volume")
+			os.Exit(2)
+		}
 	}
 
 	return nil
@@ -615,7 +631,7 @@ func main() {
 	flag.Parse()
 
 	//Logic to check the program is ingesting proper flags
-	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *teamName, *scanPrivateReposOnly, *orgOnly)
+	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *teamName, *scanPrivateReposOnly, *orgOnly, *toolName)
 	check(err)
 
 	//Authenticating to Github using the token

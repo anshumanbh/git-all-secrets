@@ -1,12 +1,17 @@
 FROM golang:latest
 MAINTAINER Anshuman Bhartiya <anshuman.bhartiya@gmail.com>
 
-ADD . /data
-WORKDIR /data/thog
+COPY main.go /data/main.go
+COPY rungitsecrets.sh /data/rungitsecrets.sh
+COPY runreposupervisor.sh /data/runreposupervisor.sh
 
 RUN apt-get update && apt-get install -y python-pip jq
-RUN pip install -r requirements.txt
-RUN chmod +x truffleHog/truffleHog.py
+
+WORKDIR /data
+RUN git clone https://github.com/dxa4481/truffleHog.git
+COPY regexChecks.py /data/truffleHog/truffleHog/regexChecks.py
+COPY requirements.txt /data/truffleHog/requirements.txt
+RUN pip install -r /data/truffleHog/requirements.txt
 
 # create a generic SSH config for Github
 WORKDIR /root/.ssh

@@ -1,5 +1,0 @@
-/build/
-/dist/
-/truffleHog.egg-info/
-*/__pycache__/
-env/

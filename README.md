@@ -103,7 +103,7 @@ A short demo is here - https://www.youtube.com/watch?v=KMO0Mid3npQ&feature=youtu
 * Support scanning Github Enterprise
 * Support cloning and scanning private repositories of an org
 * Test team scanning functionality
-* If repoURL provided is a ssh url, then make sure the scanPrivateReposOnly flag is also present
+* Replace gitsecrets and repo-supervisor by truffleHog once https://github.com/dxa4481/truffleHog/issues/69 is fixed
 * ~~Add support for scanning private user repositories via SSH keys~~ - DONE!
 * ~~Add flag to avoid scanning forks~~ - DONE!
 
@@ -139,6 +139,8 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
+* 12/08/17 - Removed my own fork of truffleHog. Using the upstream version now along with the *new* regex functionality of truffleHog + entropy mode. Soon, I believe we can replace both gitsecrets and repo supervisor by just truffleHog once some issues are fixed.
+
 * 12/07/17 - I updated the documentation with some more details and explanation around the different flags.
 
 * 12/05/17 - Integrated scanning support for private repositories via SSH key. This has been an ask for the longest time and it is now possible to do so. Also, changed the docker image tag scheme. From now on, the latest image will have the `latest` tag. And, all the previous versions will be tagged with a number. All this couldn't have been possible without the `SimpliSafe` team, specially Matthew Cox (https://github.com/matthew-cox). So, a big shoutout to you Matt!
