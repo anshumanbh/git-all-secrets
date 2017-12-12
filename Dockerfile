@@ -2,7 +2,6 @@ FROM golang:latest
 MAINTAINER Anshuman Bhartiya <anshuman.bhartiya@gmail.com>
 
 COPY main.go /data/main.go
-COPY rungitsecrets.sh /data/rungitsecrets.sh
 COPY runreposupervisor.sh /data/runreposupervisor.sh
 
 RUN apt-get update && apt-get install -y python-pip jq
@@ -10,6 +9,7 @@ RUN apt-get update && apt-get install -y python-pip jq
 WORKDIR /data
 RUN git clone https://github.com/dxa4481/truffleHog.git
 COPY regexChecks.py /data/truffleHog/truffleHog/regexChecks.py
+COPY truffleHog.py /data/truffleHog/truffleHog/truffleHog.py
 COPY requirements.txt /data/truffleHog/requirements.txt
 RUN pip install -r /data/truffleHog/requirements.txt
 
@@ -19,13 +19,16 @@ RUN echo "Host *github.com \
 \n  IdentitiesOnly yes \
 \n  StrictHostKeyChecking no \
 \n  UserKnownHostsFile=/dev/null \
+\n  IdentityFile /root/.ssh/id_rsa \
+\n  \
+\n Host github.*.com \
+\n  IdentitiesOnly yes \
+\n  StrictHostKeyChecking no \
+\n  UserKnownHostsFile=/dev/null \
 \n  IdentityFile /root/.ssh/id_rsa" > config
 
 WORKDIR /data
-RUN chmod +x rungitsecrets.sh
 RUN chmod +x runreposupervisor.sh
-RUN git clone https://github.com/anshumanbh/git-secrets.git && cd git-secrets && make install
-
 RUN git clone https://github.com/anshumanbh/repo-supervisor.git
 
 WORKDIR /data/repo-supervisor

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,10 +30,22 @@ var (
 	gistURL              = flag.String("gistURL", "", "HTTPS URL of the Github gist to scan. Example: https://gist.github.com/secretuser1/81963f276280d484767f9be895316afc")
 	cloneForks           = flag.Bool("cloneForks", false, "Option to clone org and user repos that are forks. Default is false")
 	orgOnly              = flag.Bool("orgOnly", false, "Option to skip cloning user repo's when scanning an org. Default is false")
-	toolName             = flag.String("toolName", "all", "Specify whether to run gitsecrets, thog or repo-supervisor")
+	toolName             = flag.String("toolName", "all", "Specify whether to run thog or repo-supervisor")
 	teamName             = flag.String("teamName", "", "Name of the Organization Team which has access to private repositories for scanning.")
 	scanPrivateReposOnly = flag.Bool("scanPrivateReposOnly", false, "Option to scan private repositories only. Default is false")
+	enterpriseURL        = flag.String("enterpriseURL", "", "Base URL of the Github Enterprise")
+	threads              = flag.Int("threads", 10, "Amount of parallel threads")
+	thogEntropy          = flag.Bool("thogEntropy", false, "Option to include high entropy secrets when truffleHog is used")
+	executionQueue       chan bool
 )
+
+func enqueueJob(item func()) {
+	executionQueue <- true
+	go func() {
+		item()
+		<-executionQueue
+	}()
+}
 
 // Info Function to show colored text
 func Info(format string, args ...interface{}) {
@@ -50,17 +63,23 @@ func check(e error) {
 }
 
 func gitclone(cloneURL string, repoName string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	cmd := exec.Command("/usr/bin/git", "clone", cloneURL, repoName)
-	var out bytes.Buffer
+	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
+	cmd.Stderr = &stderr
 	err := cmd.Run()
-	check(err)
-	wg.Done()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		panic(err)
+	}
 }
 
 // Moving cloning logic out of individual functions
 func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup) {
 	urlToClone := ""
+
 	switch *scanPrivateReposOnly {
 	case false:
 		urlToClone = *repo.CloneURL
@@ -68,6 +87,10 @@ func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup)
 		urlToClone = *repo.SSHURL
 	default:
 		urlToClone = *repo.CloneURL
+	}
+
+	if *enterpriseURL != "" {
+		urlToClone = *repo.SSHURL
 	}
 
 	var orgclone sync.WaitGroup
@@ -78,18 +101,22 @@ func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup)
 		// clone it
 		orgclone.Add(1)
 		fmt.Println(urlToClone)
-		// thread out the git clone
-		go gitclone(urlToClone, directory, &orgclone)
+		func(orgclone *sync.WaitGroup, urlToClone string, directory string) {
+			enqueueJob(func() {
+				gitclone(urlToClone, directory, orgclone)
+			})
+		}(&orgclone, urlToClone, directory)
 	}
 
 	orgclone.Wait()
-	fmt.Println("")
 	wg.Done()
 }
 
 func cloneorgrepos(ctx context.Context, client *github.Client, org string) error {
 
 	Info("Cloning the repositories of the organization: " + org)
+	Info("If the token provided belongs to a user in this organization, this will also clone all public AND private repositories of this org, irrespecitve of the scanPrivateReposOnly flag being set..")
+
 	var orgRepos []*github.Repository
 	opt := &github.RepositoryListByOrgOptions{
 		ListOptions: github.ListOptions{PerPage: 10},
@@ -114,12 +141,13 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 	}
 
 	orgrepowg.Wait()
-	fmt.Println("")
+	fmt.Println("Done cloning org repos.")
 	return nil
 }
 
 func cloneuserrepos(ctx context.Context, client *github.Client, user string) error {
 	Info("Cloning " + user + "'s repositories")
+	Info("If the scanPrivateReposOnly flag is set, this will only scan the private repositories of this user. If that flag is not set, only public repositories are scanned. ")
 
 	var uname string
 	var userRepos []*github.Repository
@@ -156,27 +184,22 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 	}
 
 	userrepowg.Wait()
-	fmt.Println("")
+	fmt.Println("Done cloning user repos.")
 	return nil
 }
 
 func cloneusergists(ctx context.Context, client *github.Client, user string) error {
 	Info("Cloning " + user + "'s gists")
+	Info("Irrespective of the scanPrivateReposOnly flag being set or not, this will scan all public AND secret gists of a user whose token is provided")
 
-	var uname2 string
-
-	if *scanPrivateReposOnly {
-		uname2 = ""
-	} else {
-		uname2 = user
-	}
+	var gisturl string
 
 	var userGists []*github.Gist
 	opt4 := &github.GistListOptions{
 		ListOptions: github.ListOptions{PerPage: 10},
 	}
 	for {
-		uGists, resp, err := client.Gists.List(ctx, uname2, opt4)
+		uGists, resp, err := client.Gists.List(ctx, user, opt4)
 		check(err)
 		userGists = append(userGists, uGists...)
 		if resp.NextPage == 0 {
@@ -189,14 +212,26 @@ func cloneusergists(ctx context.Context, client *github.Client, user string) err
 	//iterating through the userGists array
 	for _, userGist := range userGists {
 		usergistclone.Add(1)
-		fmt.Println(*userGist.GitPullURL)
+
+		if *enterpriseURL != "" {
+			d := strings.Split(*userGist.GitPullURL, "/")[2]
+			f := strings.Split(*userGist.GitPullURL, "/")[4]
+			gisturl = "git@" + d + ":gist/" + f
+		} else {
+			gisturl = *userGist.GitPullURL
+		}
+
+		fmt.Println(gisturl)
 
 		//cloning the individual user gists
-		go gitclone(*userGist.GitPullURL, "/tmp/repos/users/"+user+"/"+*userGist.ID, &usergistclone)
+		func(userGist *github.Gist, user string, usergistclone *sync.WaitGroup) {
+			enqueueJob(func() {
+				gitclone(gisturl, "/tmp/repos/users/"+user+"/"+*userGist.ID, usergistclone)
+			})
+		}(userGist, user, &usergistclone)
 	}
 
 	usergistclone.Wait()
-	fmt.Println("")
 	return nil
 }
 
@@ -220,16 +255,6 @@ func listallusers(ctx context.Context, client *github.Client, org string) ([]*gi
 	return allUsers, nil
 }
 
-func runGitsecrets(filepath string, reponame string, orgoruser string) error {
-	outputFile2 := "/tmp/results/gitsecrets/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
-	cmd2 := exec.Command("./rungitsecrets.sh", filepath, outputFile2)
-	var out2 bytes.Buffer
-	cmd2.Stdout = &out2
-	err2 := cmd2.Run()
-	check(err2)
-	return nil
-}
-
 func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	outputFile1 := "/tmp/results/thog/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
 
@@ -238,7 +263,13 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	check(fileErr)
 	defer outfile.Close()
 
-	cmd1 := exec.Command("python", "./truffleHog/truffleHog/truffleHog.py", "--regex", "--entropy=True", filepath)
+	var cmd1 *exec.Cmd
+
+	if *thogEntropy {
+		cmd1 = exec.Command("python", "./truffleHog/truffleHog/truffleHog.py", "--regex", "--entropy=True", filepath)
+	} else {
+		cmd1 = exec.Command("python", "./truffleHog/truffleHog/truffleHog.py", "--regex", "--entropy=False", filepath)
+	}
 
 	// direct stdout to the outfile
 	cmd1.Stdout = outfile
@@ -259,18 +290,13 @@ func runReposupervisor(filepath string, reponame string, orgoruser string) error
 }
 
 func runGitTools(tool string, filepath string, wg *sync.WaitGroup, reponame string, orgoruser string) {
+	defer wg.Done()
 
 	switch tool {
 	case "all":
-		err := runGitsecrets(filepath, reponame, orgoruser)
-		check(err)
-		err = runTrufflehog(filepath, reponame, orgoruser)
+		err := runTrufflehog(filepath, reponame, orgoruser)
 		check(err)
 		err = runReposupervisor(filepath, reponame, orgoruser)
-		check(err)
-
-	case "gitsecrets":
-		err := runGitsecrets(filepath, reponame, orgoruser)
 		check(err)
 
 	case "thog":
@@ -281,20 +307,22 @@ func runGitTools(tool string, filepath string, wg *sync.WaitGroup, reponame stri
 		err := runReposupervisor(filepath, reponame, orgoruser)
 		check(err)
 	}
-
-	wg.Done()
 }
 
 func scanforeachuser(user string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	var wguserrepogist sync.WaitGroup
 	gituserrepos, _ := ioutil.ReadDir("/tmp/repos/users/" + user)
 	for _, f := range gituserrepos {
 		wguserrepogist.Add(1)
-		go runGitTools(*toolName, "/tmp/repos/users/"+user+"/"+f.Name()+"/", &wguserrepogist, f.Name(), user)
-
+		func(user string, wg *sync.WaitGroup, wguserrepogist *sync.WaitGroup, f os.FileInfo) {
+			enqueueJob(func() {
+				runGitTools(*toolName, "/tmp/repos/users/"+user+"/"+f.Name()+"/", wguserrepogist, f.Name(), user)
+			})
+		}(user, wg, &wguserrepogist, f)
 	}
 	wguserrepogist.Wait()
-	wg.Done()
 }
 
 func toolsOutput(toolname string, of *os.File) error {
@@ -377,15 +405,12 @@ func combineOutput(toolname string, outputfile string) error {
 
 	switch toolname {
 	case "all":
-		tools := []string{"thog", "gitsecrets", "repo-supervisor"}
+		tools := []string{"thog", "repo-supervisor"}
 
 		for _, tool := range tools {
 			err = toolsOutput(tool, of)
 			check(err)
 		}
-	case "gitsecrets":
-		err = singletoolOutput("gitsecrets", of)
-		check(err)
 	case "thog":
 		err = singletoolOutput("thog", of)
 		check(err)
@@ -411,7 +436,11 @@ func scanDir(dir string, org string) error {
 	allRepos, _ := ioutil.ReadDir(dir)
 	for _, f := range allRepos {
 		wg.Add(1)
-		go runGitTools(*toolName, dir+f.Name()+"/", &wg, f.Name(), org)
+		func(f os.FileInfo, wg *sync.WaitGroup, org string) {
+			enqueueJob(func() {
+				runGitTools(*toolName, dir+f.Name()+"/", wg, f.Name(), org)
+			})
+		}(f, &wg, org)
 
 	}
 	wg.Wait()
@@ -433,7 +462,21 @@ func stringInSlice(a string, list []*github.Repository) (bool, error) {
 	return false, nil
 }
 
-func checkflags(token string, org string, user string, repoURL string, gistURL string, teamName string, scanPrivateReposOnly bool, orgOnly bool, toolName string) error {
+func checkifsshkeyexists() error {
+	fmt.Println("Checking to see if the SSH key exists or not..")
+
+	fi, err := os.Stat("/root/.ssh/id_rsa")
+	if err == nil && fi.Size() > 0 {
+		fmt.Println("SSH key exists and file size > 0 so continuing..")
+	}
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(2)
+	}
+	return nil
+}
+
+func checkflags(token string, org string, user string, repoURL string, gistURL string, teamName string, scanPrivateReposOnly bool, orgOnly bool, toolName string, enterpriseURL string, thogEntropy bool) error {
 	if token == "" {
 		fmt.Println("Need a Github personal access token. Please provide that using the -token flag")
 		os.Exit(2)
@@ -452,87 +495,140 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 	} else if gistURL != "" && (org != "" || repoURL != "" || user != "") {
 		fmt.Println("Can't have gistURL along with any of org, user or repoURL. Please provide just one of these values")
 		os.Exit(2)
+	} else if thogEntropy && !(toolName == "" || toolName == "thog") {
+		fmt.Println("thogEntropy flag should be used only when thog is being run. So, either leave the toolName blank or the toolName should be thog")
+		os.Exit(2)
+	} else if enterpriseURL == "" && (repoURL != "" || gistURL != "") {
+		var ed, url string
+
+		if repoURL != "" {
+			url = repoURL
+		} else if gistURL != "" {
+			url = gistURL
+		}
+
+		if strings.Split(strings.Split(url, ":")[0], "@")[0] == "git" {
+			fmt.Println("SSH URL")
+			ed = strings.Split(strings.Split(url, ":")[0], "@")[1]
+		} else if strings.Split(url, "/")[0] == "https:" {
+			fmt.Println("HTTPS URL")
+			ed = strings.Split(url, "/")[2]
+		}
+
+		matched, err := regexp.MatchString("github.com", ed)
+		check(err)
+
+		if !matched {
+			fmt.Println("By the domain provided in the repoURL/gistURL, it looks like you are trying to scan a Github Enterprise repo/gist. Therefore, you need to provide the enterpriseURL flag as well")
+			os.Exit(2)
+		}
 	} else if teamName != "" && org == "" {
 		fmt.Println("Can't have a teamName without an org! Please provide a value for org along with the team name")
 		os.Exit(2)
 	} else if orgOnly && org == "" {
 		fmt.Println("orgOnly flag should be used with a valid org")
 		os.Exit(2)
-	} else if scanPrivateReposOnly && user == "" && repoURL == "" {
-		fmt.Println("scanPrivateReposOnly flag should be used along with either the user or the repoURL")
+	} else if scanPrivateReposOnly && user == "" && repoURL == "" && org == "" {
+		fmt.Println("scanPrivateReposOnly flag should be used along with either the user, org or the repoURL")
 		os.Exit(2)
-	} else if scanPrivateReposOnly && (user != "" || repoURL != "") {
-		fmt.Println("scanPrivateReposOnly flag is provided with either the user or the repoURL")
-		fmt.Println("Checking to see if the SSH key exists or not..")
+	} else if scanPrivateReposOnly && (user != "" || repoURL != "" || org != "") {
+		fmt.Println("scanPrivateReposOnly flag is provided with either the user, the repoURL or the org")
 
-		fi, err := os.Stat("/root/.ssh/id_rsa")
-		if err == nil && fi.Size() > 0 {
-			fmt.Println("SSH key exists and file size > 0 so continuing..")
-		}
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(2)
-		}
+		err := checkifsshkeyexists()
+		check(err)
 
 		//Authenticating to Github using the token
 		ctx1 := context.Background()
-		ts1 := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: token},
-		)
-		tc1 := oauth2.NewClient(ctx1, ts1)
-		client1 := github.NewClient(tc1)
+		client1, err := authenticatetogit(ctx1, token)
+		check(err)
 
-		var userRepos []*github.Repository
-		opt3 := &github.RepositoryListOptions{
-			Affiliation: "owner",
-			ListOptions: github.ListOptions{PerPage: 10},
-		}
-
-		for {
-			uRepos, resp, err := client1.Repositories.List(ctx1, "", opt3)
-			check(err)
-			userRepos = append(userRepos, uRepos...) //adding to the userRepos array
-			if resp.NextPage == 0 {
-				break
+		if user != "" || repoURL != "" {
+			var userRepos []*github.Repository
+			opt3 := &github.RepositoryListOptions{
+				Affiliation: "owner",
+				ListOptions: github.ListOptions{PerPage: 10},
 			}
-			opt3.Page = resp.NextPage
-		}
 
-		if user != "" {
-			fmt.Println("scanPrivateReposOnly flag is provided along with the user")
-			fmt.Println("Checking to see if the token provided belongs to the user or not..")
+			for {
+				uRepos, resp, err := client1.Repositories.List(ctx1, "", opt3)
+				check(err)
+				userRepos = append(userRepos, uRepos...) //adding to the userRepos array
+				if resp.NextPage == 0 {
+					break
+				}
+				opt3.Page = resp.NextPage
+			}
 
-			if *userRepos[0].Owner.Login == user {
-				fmt.Println("Token belongs to the user")
+			if user != "" {
+				fmt.Println("scanPrivateReposOnly flag is provided along with the user")
+				fmt.Println("Checking to see if the token provided belongs to the user or not..")
+
+				if *userRepos[0].Owner.Login == user {
+					fmt.Println("Token belongs to the user")
+				} else {
+					fmt.Println("Token does not belong to the user. Please provide the correct token for the user mentioned.")
+					os.Exit(2)
+				}
+
+			} else if repoURL != "" {
+				fmt.Println("scanPrivateReposOnly flag is provided along with the repoURL")
+				fmt.Println("Checking to see if the repo provided belongs to the user or not..")
+				val, err := stringInSlice(repoURL, userRepos)
+				check(err)
+				if val {
+					fmt.Println("Repo belongs to the user provided")
+				} else {
+					fmt.Println("Repo does not belong to the user whose token is provided. Please provide a valid repoURL that belongs to the user whose token is provided.")
+					os.Exit(2)
+				}
+			}
+		} else if org != "" {
+			var orgRepos []*github.Repository
+
+			opt3 := &github.RepositoryListByOrgOptions{
+				Type:        "private",
+				ListOptions: github.ListOptions{PerPage: 10},
+			}
+
+			for {
+				repos, resp, err := client1.Repositories.ListByOrg(ctx1, org, opt3)
+				check(err)
+				orgRepos = append(orgRepos, repos...)
+				if resp.NextPage == 0 {
+					break
+				}
+				opt3.Page = resp.NextPage
+			}
+
+			fmt.Println("scanPrivateReposOnly flag is provided along with the org")
+			fmt.Println("Checking to see if the token provided belongs to a user in the org or not..")
+
+			var i int
+			if i >= 0 && i < len(orgRepos) {
+				fmt.Println("Private Repos exist in this org and token belongs to a user in this org")
 			} else {
-				fmt.Println("Token does not belong to the user. Please provide the correct token for the user mentioned.")
+				fmt.Println("Even though the token belongs to a user in this org, there are no Private repos in this org")
 				os.Exit(2)
 			}
 
-		} else if repoURL != "" {
-			fmt.Println("scanPrivateReposOnly flag is provided along with the repoURL")
-			fmt.Println("Checking to see if the repo provided belongs to the user or not..")
-			val, err := stringInSlice(repoURL, userRepos)
-			check(err)
-			if val {
-				fmt.Println("Repo belongs to the user provided")
-			} else {
-				fmt.Println("Repo does not belong to the user whose token is provided. Please provide a valid repoURL that belongs to the user whose token is provided.")
-				os.Exit(2)
-			}
 		}
 
-	} else if scanPrivateReposOnly && (org != "" || gistURL != "") {
-		fmt.Println("scanPrivateReposOnly flag should not be provided with either the org or the gistURL since its a private repository or multiple private repositories that we are looking to scan. Please provide either a user or a private repoURL")
+	} else if scanPrivateReposOnly && gistURL != "" {
+		fmt.Println("scanPrivateReposOnly flag should NOT be provided with the gistURL since its a private repository or multiple private repositories that we are looking to scan. Please provide either a user, an org or a private repoURL")
 		os.Exit(2)
-	} else if !(toolName == "thog" || toolName == "gitsecrets" || toolName == "repo-supervisor" || toolName == "all") {
-		fmt.Println("Please enter either thog, gitsecrets, repo-supervisor or all.")
+	} else if !(toolName == "thog" || toolName == "repo-supervisor" || toolName == "all") {
+		fmt.Println("Please enter either thog or repo-supervisor. Default is all.")
 		os.Exit(2)
-	} else if repoURL != "" && !scanPrivateReposOnly {
+	} else if repoURL != "" && !scanPrivateReposOnly && enterpriseURL == "" {
 		if strings.Split(repoURL, "@")[0] == "git" {
-			fmt.Println("Since the repoURL is a SSH URL, it is required to have the scanPrivateReposOnly flag and the SSH key mounted on a volume")
+			fmt.Println("Since the repoURL is a SSH URL and no enterprise URL is provided, it is required to have the scanPrivateReposOnly flag and the SSH key mounted on a volume")
 			os.Exit(2)
 		}
+	} else if enterpriseURL != "" {
+		fmt.Println("Since enterpriseURL is provided, checking to see if the SSH key is also mounted or not")
+
+		err := checkifsshkeyexists()
+		check(err)
 	}
 
 	return nil
@@ -545,7 +641,6 @@ func makeDirectories() error {
 	os.MkdirAll("/tmp/repos/singlerepo", 0700)
 	os.MkdirAll("/tmp/repos/singlegist", 0700)
 	os.MkdirAll("/tmp/results/thog", 0700)
-	os.MkdirAll("/tmp/results/gitsecrets", 0700)
 	os.MkdirAll("/tmp/results/repo-supervisor", 0700)
 
 	return nil
@@ -606,7 +701,6 @@ func cloneTeamRepos(ctx context.Context, client *github.Client, org string, team
 		}
 
 		teamrepowg.Wait()
-		fmt.Println("")
 
 	} else {
 		fmt.Println("Unable to find the team '" + teamName + "'; perhaps the user is not a member?\n")
@@ -625,22 +719,43 @@ func scanTeamRepos(org string) error {
 	return nil
 }
 
+func authenticatetogit(ctx context.Context, token string) (*github.Client, error) {
+	var client *github.Client
+	var err error
+
+	//Authenticating to Github using the token
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+
+	if *enterpriseURL == "" {
+		client = github.NewClient(tc)
+	} else if *enterpriseURL != "" {
+		client, err = github.NewEnterpriseClient(*enterpriseURL, *enterpriseURL, tc)
+		if err != nil {
+			fmt.Printf("NewEnterpriseClient returned unexpected error: %v", err)
+		}
+	}
+	return client, nil
+}
+
 func main() {
 
 	//Parsing the flags
 	flag.Parse()
 
+	executionQueue = make(chan bool, *threads)
+
 	//Logic to check the program is ingesting proper flags
-	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *teamName, *scanPrivateReposOnly, *orgOnly, *toolName)
+	err := checkflags(*token, *org, *user, *repoURL, *gistURL, *teamName, *scanPrivateReposOnly, *orgOnly, *toolName, *enterpriseURL, *thogEntropy)
 	check(err)
 
-	//Authenticating to Github using the token
 	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: *token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
+
+	//authN
+	client, err := authenticatetogit(ctx, *token)
+	check(err)
 
 	//Creating some temp directories to store repos & results. These will be deleted in the end
 	err = makeDirectories()
@@ -733,27 +848,47 @@ func main() {
 	} else if *repoURL != "" || *gistURL != "" { //If either repoURL or gistURL was supplied
 
 		var url, repoorgist, fpath, rn, lastString, orgoruserName string
+		var splitArray []string
 		var bpath = "/tmp/repos/"
 
 		if *repoURL != "" { //repoURL
-			url = *repoURL
+			if *enterpriseURL != "" && strings.Split(strings.Split(*repoURL, "/")[0], "@")[0] != "git" {
+				url = "git@" + strings.Split(*repoURL, "/")[2] + ":" + strings.Split(*repoURL, "/")[3] + "/" + strings.Split(*repoURL, "/")[4]
+			} else {
+				url = *repoURL
+			}
 			repoorgist = "repo"
 		} else { //gistURL
-			url = *gistURL
+			if *enterpriseURL != "" && strings.Split(strings.Split(*gistURL, "/")[0], "@")[0] != "git" {
+				url = "git@" + strings.Split(*gistURL, "/")[2] + ":" + strings.Split(*gistURL, "/")[3] + "/" + strings.Split(*gistURL, "/")[4]
+			} else {
+				url = *gistURL
+			}
 			repoorgist = "gist"
 		}
 
 		Info("The tool will proceed to clone and scan: " + url + " only\n")
 
-		splitArray := strings.Split(url, "/")
-		lastString = splitArray[len(splitArray)-1]
+		if *enterpriseURL == "" && strings.Split(strings.Split(*gistURL, "/")[0], "@")[0] == "git" {
+			splitArray = strings.Split(url, ":")
+			lastString = splitArray[len(splitArray)-1]
+		} else {
+			splitArray = strings.Split(url, "/")
+			lastString = splitArray[len(splitArray)-1]
+		}
 
 		if !*scanPrivateReposOnly {
-			orgoruserName = splitArray[3]
+			if *enterpriseURL != "" {
+				orgoruserName = strings.Split(splitArray[0], ":")[1]
+			} else {
+				if *enterpriseURL == "" && strings.Split(strings.Split(*gistURL, "/")[0], "@")[0] == "git" {
+					orgoruserName = splitArray[1]
+				} else {
+					orgoruserName = splitArray[3]
+				}
+			}
 		} else {
-			tempstr := splitArray[0]
-			tempstr2 := strings.Split(tempstr, ":")
-			orgoruserName = tempstr2[1]
+			orgoruserName = strings.Split(splitArray[0], ":")[1]
 		}
 
 		switch repoorgist {
@@ -769,7 +904,11 @@ func main() {
 		Info("Starting to clone: " + url + "\n")
 		var wgo sync.WaitGroup
 		wgo.Add(1)
-		go gitclone(url, fpath, &wgo)
+		func(url string, fpath string, wgo *sync.WaitGroup) {
+			enqueueJob(func() {
+				gitclone(url, fpath, wgo)
+			})
+		}(url, fpath, &wgo)
 		wgo.Wait()
 		Info("Cloning of: " + url + " finished\n")
 
@@ -778,7 +917,11 @@ func main() {
 		var wgs sync.WaitGroup
 		wgs.Add(1)
 
-		go runGitTools(*toolName, fpath+"/", &wgs, rn, orgoruserName)
+		func(rn string, fpath string, wgs *sync.WaitGroup, orgoruserName string) {
+			enqueueJob(func() {
+				runGitTools(*toolName, fpath+"/", wgs, rn, orgoruserName)
+			})
+		}(rn, fpath, &wgs, orgoruserName)
 
 		wgs.Wait()
 		Info("Scanning of: " + url + " finished\n")
