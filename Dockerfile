@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y python-pip jq
 WORKDIR /data
 RUN git clone https://github.com/dxa4481/truffleHog.git
 COPY regexChecks.py /data/truffleHog/truffleHog/regexChecks.py
-COPY truffleHog.py /data/truffleHog/truffleHog/truffleHog.py
 COPY requirements.txt /data/truffleHog/requirements.txt
 RUN pip install -r /data/truffleHog/requirements.txt
 
