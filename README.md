@@ -160,6 +160,8 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
+* 12/12/17 - For some large repos, truffleHog fails and exits. But, we don't want to stop there. We want to notify the user that scanning failed for that repo and continue scanning the other repos. This is now implemented in the latest docker image.
+
 * 12/11/17 - Removed gitsecrets because truffleHog supports regex functionality now. Simply, adding your regexes in the `regexChecks.py` file and rebuilding the Docker image will basically give us the functionality that gitsecrets was giving previously so there is no need for gitsecrets anymore. I also added support for scanning Github Enterprise repos & gists. @high-stakes helped get a PR in that (hopefully) fixes the Goroutine bug by limiting the amount of threads. Finally, support for scanning private repositories for an organization was added as well.
 
 * 12/08/17 - Removed my own fork of truffleHog. Using the upstream version now along with the *new* regex functionality of truffleHog + entropy mode. Soon, I believe we can replace both gitsecrets and repo supervisor by just truffleHog once some issues are fixed.

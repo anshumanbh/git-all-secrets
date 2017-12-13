@@ -275,7 +275,13 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	cmd1.Stdout = outfile
 
 	err1 := cmd1.Run()
-	check(err1)
+	if err1 != nil {
+		Info("truffleHog Scanning failed for: " + orgoruser + "_" + reponame + ". Please scan it manually.")
+		fmt.Println(err1)
+	} else {
+		fmt.Println("Finished truffleHog Scanning for: " + orgoruser + "_" + reponame)
+	}
+
 	return nil
 }
 
@@ -285,7 +291,12 @@ func runReposupervisor(filepath string, reponame string, orgoruser string) error
 	var out3 bytes.Buffer
 	cmd3.Stdout = &out3
 	err3 := cmd3.Run()
-	check(err3)
+	if err3 != nil {
+		Info("Repo Supervisor Scanning failed for: " + orgoruser + "_" + reponame + ". Please scan it manually.")
+		fmt.Println(err3)
+	} else {
+		fmt.Println("Finished Repo Supervisor Scanning for: " + orgoruser + "_" + reponame)
+	}
 	return nil
 }
 
@@ -495,7 +506,7 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 	} else if gistURL != "" && (org != "" || repoURL != "" || user != "") {
 		fmt.Println("Can't have gistURL along with any of org, user or repoURL. Please provide just one of these values")
 		os.Exit(2)
-	} else if thogEntropy && !(toolName == "" || toolName == "thog") {
+	} else if thogEntropy && !(toolName == "all" || toolName == "thog") {
 		fmt.Println("thogEntropy flag should be used only when thog is being run. So, either leave the toolName blank or the toolName should be thog")
 		os.Exit(2)
 	} else if enterpriseURL == "" && (repoURL != "" || gistURL != "") {
