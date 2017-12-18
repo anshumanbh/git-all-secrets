@@ -185,3 +185,7 @@ So, as you can see, there are decent tools out there, but they had to be combine
 * 6/14/17 - Added repo-supervisor as a scanning tool, also updated and added the version number to the docker image - abhartiya/tools_gitallsecrets:v1
 
 * 6/14/17 - Added the flag cloneForks to avoid cloning forks of org and user repos. By default, this is false. If you wish to scan forks, just set the value to 1 i.e. -cloneForks=1
+
+
+### Donate
+If you want to show some love, my BTC wallet address is `1PtMhXWCcMZCitcDfaEBe7jnV9sjKoNvq7`.
