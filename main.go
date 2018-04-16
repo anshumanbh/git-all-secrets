@@ -593,7 +593,7 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 					os.Exit(2)
 				}
 			}
-		} else if org != "" {
+		} else if org != "" && teamName == "" {
 			var orgRepos []*github.Repository
 
 			opt3 := &github.RepositoryListByOrgOptions{
