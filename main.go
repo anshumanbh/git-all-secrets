@@ -686,7 +686,7 @@ func cloneTeamRepos(ctx context.Context, client *github.Client, org string, team
 	team, err := findTeamByName(ctx, client, org, teamName)
 
 	if team != nil {
-		Info("Cloning the repositories of the team: " + *team.Name + "(" + strconv.Itoa(*team.ID) + ")")
+		Info("Cloning the repositories of the team: " + *team.Name + "(" + strconv.FormatInt(*team.ID, 10) + ")")
 		var teamRepos []*github.Repository
 		listTeamRepoOpts := &github.ListOptions{
 			PerPage: 10,
