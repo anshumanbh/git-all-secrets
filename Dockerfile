@@ -41,9 +41,9 @@ RUN pip install -r truffleHog/requirements.txt
 COPY rules.json truffleHog/
 
 # Install repo-supervisor
+WORKDIR /root/repo-supervisor
 COPY runreposupervisor.sh ./
 RUN chmod +x runreposupervisor.sh
-WORKDIR /root/repo-supervisor
 RUN npm install --no-optional && \
     npm run build && \
     npm run cli ./src/

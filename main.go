@@ -287,7 +287,7 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 
 func runReposupervisor(filepath string, reponame string, orgoruser string) error {
 	outputFile3 := "/tmp/results/repo-supervisor/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
-	cmd3 := exec.Command("./runreposupervisor.sh", filepath, outputFile3)
+	cmd3 := exec.Command("/root/repo-supervisor/runreposupervisor.sh", filepath, outputFile3)
 	var out3 bytes.Buffer
 	cmd3.Stdout = &out3
 	err3 := cmd3.Run()
