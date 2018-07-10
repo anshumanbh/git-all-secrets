@@ -266,9 +266,9 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	var cmd1 *exec.Cmd
 
 	if *thogEntropy {
-		cmd1 = exec.Command("python", "./truffleHog/truffleHog/truffleHog.py", "--regex", "--entropy=True", filepath)
+		cmd1 = exec.Command("python", "./truffleHog/truffleHog/truffleHog.py", "--rules=rules.json", "--regex", "--entropy=True", filepath)
 	} else {
-		cmd1 = exec.Command("python", "./truffleHog/truffleHog/truffleHog.py", "--regex", "--entropy=False", filepath)
+		cmd1 = exec.Command("python", "./truffleHog/truffleHog/truffleHog.py", "--rules=rules.json", "--regex", "--entropy=False", filepath)
 	}
 
 	// direct stdout to the outfile

@@ -38,6 +38,7 @@ RUN git clone https://github.com/anshumanbh/repo-supervisor.git &&\
 
 # Install truffleHog
 RUN pip install -r truffleHog/requirements.txt
+COPY rules.json truffleHog/
 
 # Install repo-supervisor
 COPY runreposupervisor.sh ./
