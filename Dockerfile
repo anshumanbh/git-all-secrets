@@ -32,13 +32,12 @@ RUN echo "Host *github.com \
 \n  UserKnownHostsFile=/dev/null \
 \n  IdentityFile /root/.ssh/id_rsa" > config
 
-WORKDIR /root/
-RUN git clone https://github.com/anshumanbh/repo-supervisor.git &&\
-    git clone https://github.com/dxa4481/truffleHog.git
+RUN git clone https://github.com/anshumanbh/repo-supervisor.git /root/repo-supervisor &&\
+    git clone https://github.com/dxa4481/truffleHog.git /root/truffleHog
 
 # Install truffleHog
-RUN pip install -r truffleHog/requirements.txt
-COPY rules.json truffleHog/
+RUN pip install -r /root/truffleHog/requirements.txt
+COPY rules.json /root/truffleHog/
 
 # Install repo-supervisor
 WORKDIR /root/repo-supervisor
@@ -48,4 +47,5 @@ RUN npm install --no-optional && \
     npm run build && \
     npm run cli ./src/
 
+WORKDIR /root/
 ENTRYPOINT [ "git-all-secrets" ]
