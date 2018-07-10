@@ -275,7 +275,8 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	cmd1.Stdout = outfile
 
 	err1 := cmd1.Run()
-	if err1 != nil {
+	// truffleHog returns an exit code 1 if it finds anything
+	if err1 != nil && err1.Error() != "exit status 1" {
 		Info("truffleHog Scanning failed for: " + orgoruser + "_" + reponame + ". Please scan it manually.")
 		fmt.Println(err1)
 	} else {
