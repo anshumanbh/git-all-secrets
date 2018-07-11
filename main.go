@@ -18,7 +18,6 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/google/go-github/github"
-	uuid "github.com/satori/go.uuid"
 )
 
 var (
@@ -256,7 +255,9 @@ func listallusers(ctx context.Context, client *github.Client, org string) ([]*gi
 }
 
 func runTrufflehog(filepath string, reponame string, orgoruser string) error {
-	outputFile1 := "/tmp/results/thog/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
+	outputDir := "/tmp/results/" + orgoruser + "/" + reponame
+	os.MkdirAll(outputDir, 0700)
+	outputFile1 := outputDir + "/" + "truffleHog"
 
 	// open the out file for writing
 	outfile, fileErr := os.OpenFile(outputFile1, os.O_CREATE|os.O_RDWR, 0644)
@@ -287,7 +288,10 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 }
 
 func runReposupervisor(filepath string, reponame string, orgoruser string) error {
-	outputFile3 := "/tmp/results/repo-supervisor/" + orgoruser + "_" + reponame + "_" + uuid.NewV4().String() + ".txt"
+	outputDir := "/tmp/results/" + orgoruser + "/" + reponame
+	os.MkdirAll(outputDir, 0700)
+	outputFile3 := outputDir + "/" + "repo-supervisor"
+
 	cmd3 := exec.Command("/root/repo-supervisor/runreposupervisor.sh", filepath, outputFile3)
 	var out3 bytes.Buffer
 	cmd3.Stdout = &out3
@@ -347,63 +351,66 @@ func toolsOutput(toolname string, of *os.File) error {
 	_, err := of.WriteString("Tool: " + toolname + "\n")
 	check(err)
 
-	results, _ := ioutil.ReadDir("/tmp/results/" + toolname + "/")
-	for _, f := range results {
-		file, err := os.Open("/tmp/results/" + toolname + "/" + f.Name())
-		check(err)
+	users, _ := ioutil.ReadDir("/tmp/results/")
+	for _, user := range users {
+		repos, _ := ioutil.ReadDir("/tmp/results/" + user.Name() + "/")
+		for _, repo := range repos {
+			file, err := os.Open("/tmp/results/" + user.Name() + "/" + repo.Name() + "/" + toolname)
+			check(err)
 
-		fi, err := file.Stat()
-		check(err)
+			fi, err := file.Stat()
+			check(err)
 
-		if fi.Size() == 0 {
-			continue
-		} else if fi.Size() > 0 {
-			fname := strings.Split(f.Name(), "_")
-			orgoruserstr := fname[0]
-			rnamestr := fname[1]
+			if fi.Size() == 0 {
+				continue
+			} else if fi.Size() > 0 {
+				orgoruserstr := user.Name()
+				rnamestr := repo.Name()
 
-			_, err1 := of.WriteString("OrgorUser: " + orgoruserstr + " RepoName: " + rnamestr + "\n")
-			check(err1)
+				_, err1 := of.WriteString("OrgorUser: " + orgoruserstr + " RepoName: " + rnamestr + "\n")
+				check(err1)
 
-			if _, err2 := io.Copy(of, file); err2 != nil {
-				return err2
+				if _, err2 := io.Copy(of, file); err2 != nil {
+					return err2
+				}
+
+				_, err3 := of.WriteString(linedelimiter + "\n")
+				check(err3)
+
+				of.Sync()
+
 			}
-
-			_, err3 := of.WriteString(linedelimiter + "\n")
-			check(err3)
-
-			of.Sync()
+			defer file.Close()
 
 		}
-		defer file.Close()
-
 	}
-
 	return nil
 }
 
 func singletoolOutput(toolname string, of *os.File) error {
 
-	results, _ := ioutil.ReadDir("/tmp/results/" + toolname + "/")
-	for _, f := range results {
-		file, err := os.Open("/tmp/results/" + toolname + "/" + f.Name())
-		check(err)
+	users, _ := ioutil.ReadDir("/tmp/results/")
+	for _, user := range users {
+		repos, _ := ioutil.ReadDir("/tmp/results/" + user.Name() + "/")
+		for _, repo := range repos {
+			file, err := os.Open("/tmp/results/" + user.Name() + "/" + repo.Name() + "/" + toolname)
+			check(err)
 
-		fi, err := file.Stat()
-		check(err)
+			fi, err := file.Stat()
+			check(err)
 
-		if fi.Size() == 0 {
-			continue
-		} else if fi.Size() > 0 {
+			if fi.Size() == 0 {
+				continue
+			} else if fi.Size() > 0 {
 
-			if _, err2 := io.Copy(of, file); err2 != nil {
-				return err2
+				if _, err2 := io.Copy(of, file); err2 != nil {
+					return err2
+				}
+				of.Sync()
 			}
-			of.Sync()
+			defer file.Close()
 		}
-		defer file.Close()
 	}
-
 	return nil
 }
 
@@ -417,14 +424,14 @@ func combineOutput(toolname string, outputfile string) error {
 
 	switch toolname {
 	case "all":
-		tools := []string{"thog", "repo-supervisor"}
+		tools := []string{"truffleHog", "repo-supervisor"}
 
 		for _, tool := range tools {
 			err = toolsOutput(tool, of)
 			check(err)
 		}
-	case "thog":
-		err = singletoolOutput("thog", of)
+	case "truffleHog":
+		err = singletoolOutput("truffleHog", of)
 		check(err)
 	case "repo-supervisor":
 		err = singletoolOutput("repo-supervisor", of)
@@ -650,10 +657,6 @@ func makeDirectories() error {
 	os.MkdirAll("/tmp/repos/org", 0700)
 	os.MkdirAll("/tmp/repos/team", 0700)
 	os.MkdirAll("/tmp/repos/users", 0700)
-	os.MkdirAll("/tmp/repos/singlerepo", 0700)
-	os.MkdirAll("/tmp/repos/singlegist", 0700)
-	os.MkdirAll("/tmp/results/thog", 0700)
-	os.MkdirAll("/tmp/results/repo-supervisor", 0700)
 
 	return nil
 }
@@ -906,11 +909,10 @@ func main() {
 		switch repoorgist {
 		case "repo":
 			rn = strings.Split(lastString, ".")[0]
-			fpath = bpath + "singlerepo/" + rn
 		case "gist":
 			rn = lastString
-			fpath = bpath + "singlegist/" + lastString
 		}
+		fpath = bpath + orgoruserName + "/" + rn
 
 		//cloning
 		Info("Starting to clone: " + url + "\n")
