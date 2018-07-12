@@ -63,6 +63,8 @@ The easiest way to run `git-all-secrets` is via Docker and I highly recommend in
 
 * -thogEntropy = This is an optional flag that basically tells if you want to get back high entropy based secrets from truffleHog or not. The high entropy secrets from truffleHog produces a LOT of noise so if you don't really want all that noise and if you are running git-all-secrets on a big organization, I'd recommend not to mention this flag. By default, this is set to `False` which means truffleHog will only produce result based on the Regular expressions in the `regexChecks.py` file. If you are scanning a fairly small org with a limited set of repos or a user with a few repos, mentioning this flag makes more sense.
 
+* -mergeOutput = Optional flag to merge and deduplicate the ouput of the tools used (currently truffleHog and repo-supervisor). Default value is `False`.
+
 
 ### Note
 * The `token` flag is compulsory. This can't be empty.
