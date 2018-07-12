@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -35,8 +36,30 @@ var (
 	enterpriseURL        = flag.String("enterpriseURL", "", "Base URL of the Github Enterprise")
 	threads              = flag.Int("threads", 10, "Amount of parallel threads")
 	thogEntropy          = flag.Bool("thogEntropy", false, "Option to include high entropy secrets when truffleHog is used")
+	mergeOutput          = flag.Bool("mergeOutput", false, "Merge the output files of all the tools used into one JSON file")
 	executionQueue       chan bool
 )
+
+type truffleHogOutput struct {
+	Branch       string   `json:"branch"`
+	Commit       string   `json:"commit"`
+	CommitHash   string   `json:"commitHash"`
+	Date         string   `json:"date"`
+	Diff         string   `json:"diff"`
+	Path         string   `json:"path"`
+	PrintDiff    string   `json:"printDiff"`
+	Reason       string   `json:"reason"`
+	StringsFound []string `json:"stringsFound"`
+}
+
+type reposupervisorOutput struct {
+	Result map[string][]string `json:"result"`
+}
+
+type repositoryScan struct {
+	Repository string              `json:"repository"`
+	Results    map[string][]string `json:"stringsFound"`
+}
 
 func enqueueJob(item func()) {
 	executionQueue <- true
@@ -73,6 +96,15 @@ func gitclone(cloneURL string, repoName string, wg *sync.WaitGroup) {
 		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
 		panic(err)
 	}
+}
+
+func gitRepoURL(path string) (string, error) {
+	out, err := exec.Command("/usr/bin/git", "-C", path, "config", "--get", "remote.origin.url").Output()
+	if err != nil {
+		return "", err
+	}
+	url := strings.TrimSuffix(string(out), "\n")
+	return url, nil
 }
 
 // Moving cloning logic out of individual functions
@@ -264,13 +296,18 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	check(fileErr)
 	defer outfile.Close()
 
+	params := []string{"/root/truffleHog/truffleHog/truffleHog.py", filepath, "--rules=/root/truffleHog/rules.json", "--regex"}
+	if *mergeOutput {
+		params = append(params, "--json")
+	}
 	var cmd1 *exec.Cmd
 
 	if *thogEntropy {
-		cmd1 = exec.Command("python", "/root/truffleHog/truffleHog/truffleHog.py", "--rules=/root/truffleHog/rules.json", "--regex", "--entropy=True", filepath)
+		params = append(params, "--entropy=True")
 	} else {
-		cmd1 = exec.Command("python", "/root/truffleHog/truffleHog/truffleHog.py", "--rules=/root/truffleHog/rules.json", "--regex", "--entropy=False", filepath)
+		params = append(params, "--entropy=False")
 	}
+	cmd1 = exec.Command("python", params...)
 
 	// direct stdout to the outfile
 	cmd1.Stdout = outfile
@@ -446,6 +483,103 @@ func combineOutput(toolname string, outputfile string) error {
 	}()
 
 	return nil
+}
+
+func mergeOutputJSON(outputfile string) {
+	var results []repositoryScan
+	var basePaths []string
+
+	if *repoURL != "" || *gistURL != "" {
+		basePaths = []string{"/tmp/repos/"}
+	} else {
+		basePaths = []string{"/tmp/repos/org", "/tmp/repos/users", "/tmp/repos/team"}
+	}
+
+	for _, basePath := range basePaths {
+		users, _ := ioutil.ReadDir(basePath)
+		for _, user := range users {
+			repos, _ := ioutil.ReadDir("/tmp/results/" + user.Name() + "/")
+			for _, repo := range repos {
+				repoPath := basePath + "/" + user.Name() + "/" + repo.Name() + "/"
+				repoResultsPath := "/tmp/results/" + user.Name() + "/" + repo.Name() + "/"
+				reposupvPath := repoResultsPath + "repo-supervisor"
+				thogPath := repoResultsPath + "truffleHog"
+				reposupvExists := fileExists(reposupvPath)
+				thogExists := fileExists(thogPath)
+				repoURL, _ := gitRepoURL(repoPath)
+
+				if reposupvExists && thogExists {
+					reposupvOut, _ := loadReposupvOut(reposupvPath, repoPath)
+					thogOut, _ := loadThogOutput(thogPath)
+					mergedOut := mergeOutputs(reposupvOut, thogOut)
+					results = append(results, repositoryScan{Repository: repoURL, Results: mergedOut})
+				} else if reposupvExists {
+					reposupvOut, _ := loadReposupvOut(reposupvPath, repoPath)
+					results = append(results, repositoryScan{Repository: repoURL, Results: reposupvOut})
+				} else if thogExists {
+					thogOut, _ := loadThogOutput(thogPath)
+					results = append(results, repositoryScan{Repository: repoURL, Results: thogOut})
+				}
+			}
+		}
+	}
+	marshalledResults, err := json.Marshal(results)
+	check(err)
+	err = ioutil.WriteFile(outputfile, marshalledResults, 0644)
+	check(err)
+}
+
+func loadThogOutput(outfile string) (map[string][]string, error) {
+	results := make(map[string][]string)
+	output, err := ioutil.ReadFile(outfile)
+	if err != nil {
+		return nil, err
+	}
+
+	// There was an issue concerning truffleHog's output not being valid JSON
+	// https://github.com/dxa4481/truffleHog/issues/95
+	// but apparently it was closed without a fix.
+	entries := strings.Split(string(output), "\n")
+	for _, entry := range entries[:len(entries)-1] {
+		var issue truffleHogOutput
+		err := json.Unmarshal([]byte(entry), &issue)
+		if err != nil {
+			return nil, err
+		}
+		results[issue.Path] = issue.StringsFound
+	}
+	return results, nil
+}
+
+func loadReposupvOut(outfile string, home string) (map[string][]string, error) {
+	results := make(map[string][]string)
+	output, err := ioutil.ReadFile(outfile)
+	if err != nil {
+		return nil, err
+	}
+
+	var rsupervisorOutput reposupervisorOutput
+	json.Unmarshal(output, &rsupervisorOutput)
+	for path, stringFound := range rsupervisorOutput.Result {
+		relativePath := strings.TrimPrefix(path, home)
+		// Make sure there aren't any leading slashes
+		fileName := strings.TrimPrefix(relativePath, "/")
+		results[fileName] = stringFound
+	}
+
+	return results, nil
+}
+
+func mergeOutputs(outputA map[string][]string, outputB map[string][]string) map[string][]string {
+	for path, stringsFound := range outputA {
+		if _, included := outputB[path]; included {
+			outputB[path] = append(outputB[path], stringsFound...)
+		} else {
+			outputB[path] = stringsFound
+		}
+	}
+
+	return outputB
 }
 
 // Moving directory scanning logic out of individual functions
@@ -659,6 +793,13 @@ func makeDirectories() error {
 	os.MkdirAll("/tmp/repos/users", 0700)
 
 	return nil
+}
+
+func fileExists(file string) bool {
+	if _, err := os.Stat(file); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
 
 func findTeamByName(ctx context.Context, client *github.Client, org string, teamName string) (*github.Team, error) {
@@ -943,8 +1084,15 @@ func main() {
 	}
 
 	//Now, that all the scanning has finished, time to combine the output
-	Info("Combining the output into one file\n")
-	err = combineOutput(*toolName, *outputFile)
-	check(err)
-
+	// There are two option here:
+	if *mergeOutput {
+		// The first is to merge everything in /tmp/results into one JSON file
+		Info("Merging the output into one JSON file\n")
+		mergeOutputJSON(*outputFile)
+	} else {
+		// The second is to just concat the outputs
+		Info("Combining the output into one file\n")
+		err = combineOutput(*toolName, *outputFile)
+		check(err)
+	}
 }
