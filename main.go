@@ -490,7 +490,7 @@ func mergeOutputJSON(outputfile string) {
 	var basePaths []string
 
 	if *repoURL != "" || *gistURL != "" {
-		basePaths = []string{"/tmp/repos/"}
+		basePaths = []string{"/tmp/repos"}
 	} else {
 		basePaths = []string{"/tmp/repos/org", "/tmp/repos/users", "/tmp/repos/team"}
 	}
