@@ -508,17 +508,18 @@ func mergeOutputJSON(outputfile string) {
 				thogExists := fileExists(thogPath)
 				repoURL, _ := gitRepoURL(repoPath)
 
+				var mergedOut map[string][]string
 				if reposupvExists && thogExists {
 					reposupvOut, _ := loadReposupvOut(reposupvPath, repoPath)
 					thogOut, _ := loadThogOutput(thogPath)
-					mergedOut := mergeOutputs(reposupvOut, thogOut)
-					results = append(results, repositoryScan{Repository: repoURL, Results: mergedOut})
+					mergedOut = mergeOutputs(reposupvOut, thogOut)
 				} else if reposupvExists {
-					reposupvOut, _ := loadReposupvOut(reposupvPath, repoPath)
-					results = append(results, repositoryScan{Repository: repoURL, Results: reposupvOut})
+					mergedOut, _ = loadReposupvOut(reposupvPath, repoPath)
 				} else if thogExists {
-					thogOut, _ := loadThogOutput(thogPath)
-					results = append(results, repositoryScan{Repository: repoURL, Results: thogOut})
+					mergedOut, _ = loadThogOutput(thogPath)
+				}
+				if len(mergedOut) > 0 {
+					results = append(results, repositoryScan{Repository: repoURL, Results: mergedOut})
 				}
 			}
 		}
