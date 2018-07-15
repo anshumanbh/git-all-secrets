@@ -138,7 +138,7 @@ Above, I am scanning only the private repositories of the user whose token is pr
 
 ## Details
 ### Features
-* You can add your own regular expressions in the `regexChecks.py` file and include it when executing `docker run` using the argument `-v $(pwd)/regexChecks.py:/root/truffleHog/truffleHog/regexChecks.py`.
+* You can add your own regular expressions in the `regexChecks.py` file and include it when executing `docker run` using the argument `-v $(pwd)/rules.json:/root/truffleHog/rules.json`.
 * The tool looks for some default regular expressions. If needed, it can also be made for high entropy strings. All this happens via the truffleHog tool.
 * It can look for high entropy strings in .js and .json files via the repo-supervisor tool.
 * It scans users gists, which most of the tools dont.
