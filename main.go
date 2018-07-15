@@ -168,7 +168,7 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 	//iterating through the repo array
 	for _, repo := range orgRepos {
 		orgrepowg.Add(1)
-		go executeclone(repo, "/tmp/repos/org/"+*repo.Name, &orgrepowg)
+		go executeclone(repo, "/tmp/repos/org/"+org+"/"+*repo.Name, &orgrepowg)
 	}
 
 	orgrepowg.Wait()
@@ -601,7 +601,7 @@ func scanDir(dir string, org string) error {
 }
 
 func scanorgrepos(org string) error {
-	err := scanDir("/tmp/repos/org/", org)
+	err := scanDir("/tmp/repos/org/"+org+"/", org)
 	check(err)
 	return nil
 }
