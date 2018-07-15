@@ -6,7 +6,7 @@
     "SSH (EC) private key": "-----BEGIN EC PRIVATE KEY-----.*",
     "Generic AppSecret": "[a|A][p|P][p|P][s|S][e|E][c|C][r|R][e|E][t|T].*.[0-9a-zA-Z]{32,45}",
     "Google Oauth 2": "[c|C][l|L][i|I][e|E][n|N][T|T][_][s|S][e|E][c|C][r|R][e|E][t|T].*[:].*[a-zA-Z0-9-_]{24}",
-    "Slack Token": "(xox[p|b|o|a]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32})",
+    "Slack Token": "xox[p|b|o|a].*",
     "Generic AppSecret 2": "[a|A][p|P][p|P][s|S][e|E][c|C][r|R][e|E][t|T].*['|\"][0-9a-zA-Z]{32,45}['|\"]",
     "Generic Secret": "[s|S][e|E][c|C][r|R][e|E][t|T].*['|\"][0-9a-zA-Z]{32,45}['|\"]",
     "PGP private key block": "-----BEGIN PGP PRIVATE KEY BLOCK-----.*",
