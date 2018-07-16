@@ -29,7 +29,7 @@ The easiest way to run `git-all-secrets` is via Docker and I highly recommend in
 * Once you know what you want to scan, type something like `docker run -it abhartiya/tools_gitallsecrets -token=<> -org=<>`. You can also specify a particular tool to use for scanning by typing something like `docker run -it abhartiya/tools_gitallsecrets -token=<> -org=<> -toolName=<>`. Options are `thog` and `repo-supervisor`.
 * If you want to run truffleHog with the default regex AND the high entropy settings, provide the `thogEntropy` flag like this - `docker run -it abhartiya/tools_gitallsecrets -token=<> -org=<> -toolName=thog -thogEntropy`.
 * After the container finishes running, retrieve the container ID by typing `docker ps -a`.
-* Once you have the container ID, get the results file from the container to the host by typing `docker cp <container-id>:/data/results.txt .`
+* Once you have the container ID, get the results file from the container to the host by typing `docker cp <container-id>:/root/results.txt .`
 
 
 ## Flags/Options
@@ -62,6 +62,8 @@ The easiest way to run `git-all-secrets` is via Docker and I highly recommend in
 * -threads = Default value is `10`. This is to limit the number of threads if your system is not beefy enough. For the most part, leaving this to 10 should be okay.
 
 * -thogEntropy = This is an optional flag that basically tells if you want to get back high entropy based secrets from truffleHog or not. The high entropy secrets from truffleHog produces a LOT of noise so if you don't really want all that noise and if you are running git-all-secrets on a big organization, I'd recommend not to mention this flag. By default, this is set to `False` which means truffleHog will only produce result based on the Regular expressions in the `regexChecks.py` file. If you are scanning a fairly small org with a limited set of repos or a user with a few repos, mentioning this flag makes more sense.
+
+* -mergeOutput = Optional flag to merge and deduplicate the ouput of the tools used (currently truffleHog and repo-supervisor). Default value is `False`.
 
 
 ### Note
@@ -136,7 +138,7 @@ Above, I am scanning only the private repositories of the user whose token is pr
 
 ## Details
 ### Features
-* You can add your own regular expressions in the `regexChecks.py` file and include it when executing `docker run` using the argument `-v $(pwd)/regexChecks.py:/data/truffleHog/truffleHog/regexChecks.py`.
+* You can add your own regular expressions in the `regexChecks.py` file and include it when executing `docker run` using the argument `-v $(pwd)/rules.json:/root/truffleHog/rules.json`.
 * The tool looks for some default regular expressions. If needed, it can also be made for high entropy strings. All this happens via the truffleHog tool.
 * It can look for high entropy strings in .js and .json files via the repo-supervisor tool.
 * It scans users gists, which most of the tools dont.
@@ -160,6 +162,8 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
+* 7/15/18 - Updated repo-supervisor's fork because the upstream had some changes. Rebuilt a new Docker image using the latet Trufflehog. Provided the rules.json file that contains all the regexes that Trufflehog uses to find secrets. Added the ability to also merge outputs for both the tools using the `-mergeOutput` flag. Huge shout out to @mhmdiaa for all of this! 
+
 * 12/12/17 - For some large repos, truffleHog fails and exits. But, we don't want to stop there. We want to notify the user that scanning failed for that repo and continue scanning the other repos. This is now implemented in the latest docker image.
 
 * 12/11/17 - Removed gitsecrets because truffleHog supports regex functionality now. Simply, adding your regexes in the `regexChecks.py` file and rebuilding the Docker image will basically give us the functionality that gitsecrets was giving previously so there is no need for gitsecrets anymore. I also added support for scanning Github Enterprise repos & gists. @high-stakes helped get a PR in that (hopefully) fixes the Goroutine bug by limiting the amount of threads. Finally, support for scanning private repositories for an organization was added as well.

@@ -1,18 +1,24 @@
-FROM golang:latest
-MAINTAINER Anshuman Bhartiya <anshuman.bhartiya@gmail.com>
+# git-all-secrets build container
+FROM golang:1.10.3-alpine3.7 AS build-env
 
-COPY main.go /data/main.go
-COPY runreposupervisor.sh /data/runreposupervisor.sh
+RUN apk add --no-cache --upgrade git openssh-client ca-certificates
+RUN go get -u github.com/golang/dep/cmd/dep
 
-RUN apt-get update && apt-get install -y python-pip jq
+WORKDIR /go/src/github.com/anshumanbh/git-all-secrets
+COPY Gopkg.toml Gopkg.lock ./
+RUN dep ensure -vendor-only -v
+COPY main.go ./
+RUN go build -v -o /go/bin/git-all-secrets
 
-WORKDIR /data
-RUN git clone https://github.com/dxa4481/truffleHog.git
-COPY regexChecks.py /data/truffleHog/truffleHog/regexChecks.py
-COPY requirements.txt /data/truffleHog/requirements.txt
-RUN pip install -r /data/truffleHog/requirements.txt
+# Final container
+FROM node:9.11.2-alpine
 
-# create a generic SSH config for Github
+COPY --from=build-env /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build-env /go/bin/git-all-secrets /usr/bin/git-all-secrets
+
+RUN apk add --no-cache --upgrade git python py-pip jq
+
+# Create a generic SSH config for Github
 WORKDIR /root/.ssh
 RUN echo "Host *github.com \
 \n  IdentitiesOnly yes \
@@ -26,19 +32,20 @@ RUN echo "Host *github.com \
 \n  UserKnownHostsFile=/dev/null \
 \n  IdentityFile /root/.ssh/id_rsa" > config
 
-WORKDIR /data
+RUN git clone https://github.com/anshumanbh/repo-supervisor.git /root/repo-supervisor &&\
+    git clone https://github.com/dxa4481/truffleHog.git /root/truffleHog
+
+# Install truffleHog
+RUN pip install -r /root/truffleHog/requirements.txt
+COPY rules.json /root/truffleHog/
+
+# Install repo-supervisor
+WORKDIR /root/repo-supervisor
+COPY runreposupervisor.sh ./
 RUN chmod +x runreposupervisor.sh
-RUN git clone https://github.com/anshumanbh/repo-supervisor.git
+RUN npm install --no-optional && \
+    npm run build && \
+    npm run cli ./src/
 
-WORKDIR /data/repo-supervisor
-
-RUN curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.2/install.sh | bash
-RUN /bin/bash -c "source ~/.bashrc && nvm install 7"
-RUN /bin/bash -c "source ~/.bashrc && cd /data/repo-supervisor && npm install --no-optional && npm run build"
-
-WORKDIR /data
-
-RUN go get github.com/google/go-github/github && go get github.com/satori/go.uuid && go get golang.org/x/oauth2
-RUN go build -o gitallsecrets .
-
-ENTRYPOINT ["./gitallsecrets"]
+WORKDIR /root/
+ENTRYPOINT [ "git-all-secrets" ]

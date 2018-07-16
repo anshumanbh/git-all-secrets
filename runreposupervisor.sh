@@ -1,5 +1,5 @@
-#!/bin/bash
+#!/bin/sh
 
-JSON_OUTPUT=1 /root/.nvm/versions/node/v7.10.1/bin/node ./repo-supervisor/dist/cli.js $1 | jq '.' > $2
+JSON_OUTPUT=1 node /root/repo-supervisor/dist/cli.js $1 | jq '.' > $2
 
 exit 0
