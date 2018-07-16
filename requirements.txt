@@ -1,3 +1,0 @@
-GitPython==2.1.5
-gitdb2==2.0.2
-smmap2==2.0.2
