@@ -255,11 +255,11 @@ func cloneusergists(ctx context.Context, client *github.Client, user string) err
 		fmt.Println(gisturl)
 
 		//cloning the individual user gists
-		func(userGist *github.Gist, user string, usergistclone *sync.WaitGroup) {
+		func(gisturl string, userGist *github.Gist, user string, usergistclone *sync.WaitGroup) {
 			enqueueJob(func() {
 				gitclone(gisturl, "/tmp/repos/users/"+user+"/"+*userGist.ID, usergistclone)
 			})
-		}(userGist, user, &usergistclone)
+		}(gisturl, userGist, user, &usergistclone)
 	}
 
 	usergistclone.Wait()
