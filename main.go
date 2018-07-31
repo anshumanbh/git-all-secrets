@@ -296,7 +296,7 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	check(fileErr)
 	defer outfile.Close()
 
-	params := []string{"/root/truffleHog/truffleHog/truffleHog.py", filepath, "--rules=/root/truffleHog/rules.json", "--regex"}
+	params := []string{filepath, "--rules=/root/truffleHog/rules.json", "--regex"}
 	if *mergeOutput {
 		params = append(params, "--json")
 	}
@@ -307,7 +307,7 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 	} else {
 		params = append(params, "--entropy=False")
 	}
-	cmd1 = exec.Command("python", params...)
+	cmd1 = exec.Command("trufflehog", params...)
 
 	// direct stdout to the outfile
 	cmd1.Stdout = outfile
@@ -530,6 +530,15 @@ func mergeOutputJSON(outputfile string) {
 	check(err)
 }
 
+func appendIfMissing(slice []string, i string) []string {
+	for _, ele := range slice {
+		if ele == i {
+			return slice
+		}
+	}
+	return append(slice, i)
+}
+
 func loadThogOutput(outfile string) (map[string][]string, error) {
 	results := make(map[string][]string)
 	output, err := ioutil.ReadFile(outfile)
@@ -547,7 +556,14 @@ func loadThogOutput(outfile string) (map[string][]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		results[issue.Path] = issue.StringsFound
+		if _, found := results[issue.Path]; found {
+			for _, str := range issue.StringsFound {
+				results[issue.Path] = appendIfMissing(results[issue.Path], str)
+			}
+		} else {
+			results[issue.Path] = issue.StringsFound
+		}
+
 	}
 	return results, nil
 }

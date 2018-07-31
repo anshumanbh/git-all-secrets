@@ -18,5 +18,6 @@
     "Google Oauth": "(\"client_secret\":\"[a-zA-Z0-9-_]{24}\")",
     "Facebook Oauth": "[f|F][a|A][c|C][e|E][b|B][o|O][o|O][k|K].*['|\"][0-9a-f]{32}['|\"]",
     "SSH (OPENSSH) private key": "-----BEGIN OPENSSH PRIVATE KEY-----.*",
-    "Heroku API Key": "[h|H][e|E][r|R][o|O][k|K][u|U].*[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}"
+    "Heroku API Key": "[h|H][e|E][r|R][o|O][k|K][u|U].*[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}",
+    "Generic Password": ".*[p|P][a|A][s|S][s|S][w|W][o|O][r|R][d|D].*=.*"
 }

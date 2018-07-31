@@ -32,11 +32,11 @@ RUN echo "Host *github.com \
 \n  UserKnownHostsFile=/dev/null \
 \n  IdentityFile /root/.ssh/id_rsa" > config
 
-RUN git clone https://github.com/anshumanbh/repo-supervisor.git /root/repo-supervisor &&\
-    git clone https://github.com/dxa4481/truffleHog.git /root/truffleHog
+RUN git clone https://github.com/anshumanbh/repo-supervisor.git /root/repo-supervisor
 
 # Install truffleHog
-RUN pip install -r /root/truffleHog/requirements.txt
+WORKDIR /root/truffleHog/
+RUN pip install truffleHog
 COPY rules.json /root/truffleHog/
 
 # Install repo-supervisor

@@ -163,6 +163,8 @@ Finally, there is git-secrets which can flag things like AWS secrets. The best p
 So, as you can see, there are decent tools out there, but they had to be combined somehow. There was also a need to recursively scan multiple repositories and not just one. And, what about gists? There are organizations and users. Then, there are repositories for organizations and users. There are also gists by users. All of these should be scanned. And, scanned such that it could be automated and easily consumed by other tools/frameworks.
 
 ### Changelog
+* 7/31/18 - Made trugglehog's installation simpler by using `pip`. @mhmdiaa fixed a bug wrt trufflehog's output function where it wasn't merging and sorting properly. Updated the regex file to include things like `password`. Built and pushed a new Docker image. GLHF!
+
 * 7/15/18 - Updated repo-supervisor's fork because the upstream had some changes. Rebuilt a new Docker image using the latest Trufflehog. Provided the rules.json file that contains all the regexes that Trufflehog uses to find secrets. Added the ability to also merge outputs (in json) for both the tools using the `-mergeOutput` flag. Drastically reduced the Docker image size by using multi-stage builds and dep for managing dependencies. Huge shout out to @mhmdiaa for all of this! 
 
 * 12/12/17 - For some large repos, truffleHog fails and exits. But, we don't want to stop there. We want to notify the user that scanning failed for that repo and continue scanning the other repos. This is now implemented in the latest docker image.
