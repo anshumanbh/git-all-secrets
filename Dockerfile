@@ -15,7 +15,7 @@ FROM node:9.11.2-alpine
 
 COPY --from=build-env /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build-env /go/bin/git-all-secrets /usr/bin/git-all-secrets
-RUN apk add --no-cache --upgrade git python py-pip jq
+RUN apk add --no-cache --upgrade git python py-pip jq openssh-client
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # Create a generic SSH config for Github
