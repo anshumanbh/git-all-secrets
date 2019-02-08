@@ -37,6 +37,7 @@ var (
 	threads              = flag.Int("threads", 10, "Amount of parallel threads")
 	thogEntropy          = flag.Bool("thogEntropy", false, "Option to include high entropy secrets when truffleHog is used")
 	mergeOutput          = flag.Bool("mergeOutput", false, "Merge the output files of all the tools used into one JSON file")
+	blacklist            = flag.String("blacklist", "", "Comma seperated values of Repos to Skip Scanning for")
 	executionQueue       chan bool
 )
 
@@ -125,7 +126,6 @@ func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup)
 	}
 
 	var orgclone sync.WaitGroup
-	// do not clone forks
 	if !*cloneForks && *repo.Fork {
 		fmt.Println(*repo.Name + " is a fork and the cloneFork flag was set to false so moving on..")
 	} else {
@@ -167,8 +167,12 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 
 	//iterating through the repo array
 	for _, repo := range orgRepos {
-		orgrepowg.Add(1)
-		go executeclone(repo, "/tmp/repos/org/"+org+"/"+*repo.Name, &orgrepowg)
+		if strings.Contains(*blacklist, *repo.Name) {
+			fmt.Println("Repo " + *repo.Name + " is in the repo blacklist, moving on..")
+		} else {
+			orgrepowg.Add(1)
+			go executeclone(repo, "/tmp/repos/org/"+org+"/"+*repo.Name, &orgrepowg)
+		}
 	}
 
 	orgrepowg.Wait()
