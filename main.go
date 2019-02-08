@@ -37,6 +37,7 @@ var (
 	threads              = flag.Int("threads", 10, "Amount of parallel threads")
 	thogEntropy          = flag.Bool("thogEntropy", false, "Option to include high entropy secrets when truffleHog is used")
 	mergeOutput          = flag.Bool("mergeOutput", false, "Merge the output files of all the tools used into one JSON file")
+	blacklist            = flag.String("blacklist", "", "Comma seperated values of Repos to Skip Scanning for")
 	executionQueue       chan bool
 )
 
@@ -84,17 +85,25 @@ func check(e error) {
 	}
 }
 
-func gitclone(cloneURL string, repoName string, wg *sync.WaitGroup) {
+func gitclone(cloneURL string, repoName string, blacklist string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	cmd := exec.Command("/usr/bin/git", "clone", cloneURL, repoName)
-	var out, stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-		// panic(err)
+	fmt.Println("==============")
+	fmt.Println("cloneURL is " + cloneURL)
+	fmt.Println("blacklist is " + blacklist)
+	if strings.Contains(blacklist, cloneURL) {
+		fmt.Println("Repo " + cloneURL + " is in the repo blacklist, moving on..")
+	} else {
+
+		cmd := exec.Command("/usr/bin/git", "clone", cloneURL, repoName)
+		var out, stderr bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+			// panic(err)
+		}
 	}
 }
 
@@ -108,7 +117,7 @@ func gitRepoURL(path string) (string, error) {
 }
 
 // Moving cloning logic out of individual functions
-func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup) {
+func executeclone(repo *github.Repository, directory string, blacklist string, wg *sync.WaitGroup) {
 	urlToClone := ""
 
 	switch *scanPrivateReposOnly {
@@ -125,8 +134,9 @@ func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup)
 	}
 
 	var orgclone sync.WaitGroup
-	// do not clone forks
-	if !*cloneForks && *repo.Fork {
+	if strings.Contains(blacklist, urlToClone) {
+		fmt.Println("Repo " + urlToClone + " is in the repo blacklist, moving on..")
+	} else if !*cloneForks && *repo.Fork {
 		fmt.Println(*repo.Name + " is a fork and the cloneFork flag was set to false so moving on..")
 	} else {
 		// clone it
@@ -134,7 +144,7 @@ func executeclone(repo *github.Repository, directory string, wg *sync.WaitGroup)
 		fmt.Println(urlToClone)
 		func(orgclone *sync.WaitGroup, urlToClone string, directory string) {
 			enqueueJob(func() {
-				gitclone(urlToClone, directory, orgclone)
+				gitclone(urlToClone, directory, blacklist, orgclone)
 			})
 		}(&orgclone, urlToClone, directory)
 	}
@@ -168,7 +178,7 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 	//iterating through the repo array
 	for _, repo := range orgRepos {
 		orgrepowg.Add(1)
-		go executeclone(repo, "/tmp/repos/org/"+org+"/"+*repo.Name, &orgrepowg)
+		go executeclone(repo, "/tmp/repos/org/"+org+"/"+*repo.Name, *blacklist, &orgrepowg)
 	}
 
 	orgrepowg.Wait()
@@ -211,7 +221,7 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 	//iterating through the userRepos array
 	for _, userRepo := range userRepos {
 		userrepowg.Add(1)
-		go executeclone(userRepo, "/tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepowg)
+		go executeclone(userRepo, "/tmp/repos/users/"+user+"/"+*userRepo.Name, *blacklist, &userrepowg)
 	}
 
 	userrepowg.Wait()
@@ -257,7 +267,7 @@ func cloneusergists(ctx context.Context, client *github.Client, user string) err
 		//cloning the individual user gists
 		func(gisturl string, userGist *github.Gist, user string, usergistclone *sync.WaitGroup) {
 			enqueueJob(func() {
-				gitclone(gisturl, "/tmp/repos/users/"+user+"/"+*userGist.ID, usergistclone)
+				gitclone(gisturl, "/tmp/repos/users/"+user+"/"+*userGist.ID, *blacklist, usergistclone)
 			})
 		}(gisturl, userGist, user, &usergistclone)
 	}
@@ -870,7 +880,7 @@ func cloneTeamRepos(ctx context.Context, client *github.Client, org string, team
 		//iterating through the repo array
 		for _, repo := range teamRepos {
 			teamrepowg.Add(1)
-			go executeclone(repo, "/tmp/repos/team/"+*repo.Name, &teamrepowg)
+			go executeclone(repo, "/tmp/repos/team/"+*repo.Name, *blacklist, &teamrepowg)
 		}
 
 		teamrepowg.Wait()
@@ -1078,7 +1088,7 @@ func main() {
 		wgo.Add(1)
 		func(url string, fpath string, wgo *sync.WaitGroup) {
 			enqueueJob(func() {
-				gitclone(url, fpath, wgo)
+				gitclone(url, fpath, *blacklist, wgo)
 			})
 		}(url, fpath, &wgo)
 		wgo.Wait()
