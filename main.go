@@ -88,7 +88,7 @@ func check(e error) {
 func gitclone(cloneURL string, repoName string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	cmd := exec.Command("/usr/bin/git", "clone", cloneURL, repoName)
+	cmd := exec.Command("git", "clone", cloneURL, repoName)
 	var out, stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
@@ -100,7 +100,7 @@ func gitclone(cloneURL string, repoName string, wg *sync.WaitGroup) {
 }
 
 func gitRepoURL(path string) (string, error) {
-	out, err := exec.Command("/usr/bin/git", "-C", path, "config", "--get", "remote.origin.url").Output()
+	out, err := exec.Command("./usr/bin/git", "-C", path, "config", "--get", "remote.origin.url").Output()
 	if err != nil {
 		return "", err
 	}
@@ -171,7 +171,7 @@ func cloneorgrepos(ctx context.Context, client *github.Client, org string) error
 			fmt.Println("Repo " + *repo.Name + " is in the repo blacklist, moving on..")
 		} else {
 			orgrepowg.Add(1)
-			go executeclone(repo, "/tmp/repos/org/"+org+"/"+*repo.Name, &orgrepowg)
+			go executeclone(repo, "./tmp/repos/org/"+org+"/"+*repo.Name, &orgrepowg)
 		}
 	}
 
@@ -215,7 +215,7 @@ func cloneuserrepos(ctx context.Context, client *github.Client, user string) err
 	//iterating through the userRepos array
 	for _, userRepo := range userRepos {
 		userrepowg.Add(1)
-		go executeclone(userRepo, "/tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepowg)
+		go executeclone(userRepo, "./tmp/repos/users/"+user+"/"+*userRepo.Name, &userrepowg)
 	}
 
 	userrepowg.Wait()
@@ -261,7 +261,7 @@ func cloneusergists(ctx context.Context, client *github.Client, user string) err
 		//cloning the individual user gists
 		func(gisturl string, userGist *github.Gist, user string, usergistclone *sync.WaitGroup) {
 			enqueueJob(func() {
-				gitclone(gisturl, "/tmp/repos/users/"+user+"/"+*userGist.ID, usergistclone)
+				gitclone(gisturl, "./tmp/repos/users/"+user+"/"+*userGist.ID, usergistclone)
 			})
 		}(gisturl, userGist, user, &usergistclone)
 	}
@@ -291,7 +291,7 @@ func listallusers(ctx context.Context, client *github.Client, org string) ([]*gi
 }
 
 func runTrufflehog(filepath string, reponame string, orgoruser string) error {
-	outputDir := "/tmp/results/" + orgoruser + "/" + reponame
+	outputDir := "./tmp/results/" + orgoruser + "/" + reponame
 	os.MkdirAll(outputDir, 0700)
 	outputFile1 := outputDir + "/" + "truffleHog"
 
@@ -329,7 +329,7 @@ func runTrufflehog(filepath string, reponame string, orgoruser string) error {
 }
 
 func runReposupervisor(filepath string, reponame string, orgoruser string) error {
-	outputDir := "/tmp/results/" + orgoruser + "/" + reponame
+	outputDir := "./tmp/results/" + orgoruser + "/" + reponame
 	os.MkdirAll(outputDir, 0700)
 	outputFile3 := outputDir + "/" + "repo-supervisor"
 
@@ -370,12 +370,12 @@ func scanforeachuser(user string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	var wguserrepogist sync.WaitGroup
-	gituserrepos, _ := ioutil.ReadDir("/tmp/repos/users/" + user)
+	gituserrepos, _ := ioutil.ReadDir("./tmp/repos/users/" + user)
 	for _, f := range gituserrepos {
 		wguserrepogist.Add(1)
 		func(user string, wg *sync.WaitGroup, wguserrepogist *sync.WaitGroup, f os.FileInfo) {
 			enqueueJob(func() {
-				runGitTools(*toolName, "/tmp/repos/users/"+user+"/"+f.Name()+"/", wguserrepogist, f.Name(), user)
+				runGitTools(*toolName, "./tmp/repos/users/"+user+"/"+f.Name()+"/", wguserrepogist, f.Name(), user)
 			})
 		}(user, wg, &wguserrepogist, f)
 	}
@@ -392,11 +392,11 @@ func toolsOutput(toolname string, of *os.File) error {
 	_, err := of.WriteString("Tool: " + toolname + "\n")
 	check(err)
 
-	users, _ := ioutil.ReadDir("/tmp/results/")
+	users, _ := ioutil.ReadDir("./tmp/results/")
 	for _, user := range users {
-		repos, _ := ioutil.ReadDir("/tmp/results/" + user.Name() + "/")
+		repos, _ := ioutil.ReadDir("./tmp/results/" + user.Name() + "/")
 		for _, repo := range repos {
-			file, err := os.Open("/tmp/results/" + user.Name() + "/" + repo.Name() + "/" + toolname)
+			file, err := os.Open("./tmp/results/" + user.Name() + "/" + repo.Name() + "/" + toolname)
 			check(err)
 
 			fi, err := file.Stat()
@@ -430,11 +430,11 @@ func toolsOutput(toolname string, of *os.File) error {
 
 func singletoolOutput(toolname string, of *os.File) error {
 
-	users, _ := ioutil.ReadDir("/tmp/results/")
+	users, _ := ioutil.ReadDir("./tmp/results/")
 	for _, user := range users {
-		repos, _ := ioutil.ReadDir("/tmp/results/" + user.Name() + "/")
+		repos, _ := ioutil.ReadDir("./tmp/results/" + user.Name() + "/")
 		for _, repo := range repos {
-			file, err := os.Open("/tmp/results/" + user.Name() + "/" + repo.Name() + "/" + toolname)
+			file, err := os.Open("./tmp/results/" + user.Name() + "/" + repo.Name() + "/" + toolname)
 			check(err)
 
 			fi, err := file.Stat()
@@ -494,18 +494,18 @@ func mergeOutputJSON(outputfile string) {
 	var basePaths []string
 
 	if *repoURL != "" || *gistURL != "" {
-		basePaths = []string{"/tmp/repos"}
+		basePaths = []string{"./tmp/repos"}
 	} else {
-		basePaths = []string{"/tmp/repos/org", "/tmp/repos/users", "/tmp/repos/team"}
+		basePaths = []string{"./tmp/repos/org", "./tmp/repos/users", "./tmp/repos/team"}
 	}
 
 	for _, basePath := range basePaths {
 		users, _ := ioutil.ReadDir(basePath)
 		for _, user := range users {
-			repos, _ := ioutil.ReadDir("/tmp/results/" + user.Name() + "/")
+			repos, _ := ioutil.ReadDir("./tmp/results/" + user.Name() + "/")
 			for _, repo := range repos {
 				repoPath := basePath + "/" + user.Name() + "/" + repo.Name() + "/"
-				repoResultsPath := "/tmp/results/" + user.Name() + "/" + repo.Name() + "/"
+				repoResultsPath := "./tmp/results/" + user.Name() + "/" + repo.Name() + "/"
 				reposupvPath := repoResultsPath + "repo-supervisor"
 				thogPath := repoResultsPath + "truffleHog"
 				reposupvExists := fileExists(reposupvPath)
@@ -622,7 +622,7 @@ func scanDir(dir string, org string) error {
 }
 
 func scanorgrepos(org string) error {
-	err := scanDir("/tmp/repos/org/"+org+"/", org)
+	err := scanDir("./tmp/repos/org/"+org+"/", org)
 	check(err)
 	return nil
 }
@@ -639,7 +639,7 @@ func stringInSlice(a string, list []*github.Repository) (bool, error) {
 func checkifsshkeyexists() error {
 	fmt.Println("Checking to see if the SSH key exists or not..")
 
-	fi, err := os.Stat("/root/.ssh/id_rsa")
+	fi, err := os.Stat("./root/.ssh/id_rsa")
 	if err == nil && fi.Size() > 0 {
 		fmt.Println("SSH key exists and file size > 0 so continuing..")
 	}
@@ -809,9 +809,9 @@ func checkflags(token string, org string, user string, repoURL string, gistURL s
 }
 
 func makeDirectories() error {
-	os.MkdirAll("/tmp/repos/org", 0700)
-	os.MkdirAll("/tmp/repos/team", 0700)
-	os.MkdirAll("/tmp/repos/users", 0700)
+	os.MkdirAll("./tmp/repos/org", 0700)
+	os.MkdirAll("./tmp/repos/team", 0700)
+	os.MkdirAll("./tmp/repos/users", 0700)
 
 	return nil
 }
@@ -830,7 +830,7 @@ func findTeamByName(ctx context.Context, client *github.Client, org string, team
 	}
 	Info("Listing teams...")
 	for {
-		teams, resp, err := client.Organizations.ListTeams(ctx, org, listTeamsOpts)
+		teams, resp, err := client.Teams.ListTeams(ctx, org, listTeamsOpts)
 		check(err)
 		//check the name here--try to avoid additional API calls if we've found the team
 		for _, team := range teams {
@@ -860,7 +860,7 @@ func cloneTeamRepos(ctx context.Context, client *github.Client, org string, team
 
 		Info("Listing team repositories...")
 		for {
-			repos, resp, err := client.Organizations.ListTeamRepos(ctx, *team.ID, listTeamRepoOpts)
+			repos, resp, err := client.Teams.ListTeamRepos(ctx, *team.ID, listTeamRepoOpts)
 			check(err)
 			teamRepos = append(teamRepos, repos...) //adding to the repo array
 			if resp.NextPage == 0 {
@@ -874,7 +874,7 @@ func cloneTeamRepos(ctx context.Context, client *github.Client, org string, team
 		//iterating through the repo array
 		for _, repo := range teamRepos {
 			teamrepowg.Add(1)
-			go executeclone(repo, "/tmp/repos/team/"+*repo.Name, &teamrepowg)
+			go executeclone(repo, "./tmp/repos/team/"+*repo.Name, &teamrepowg)
 		}
 
 		teamrepowg.Wait()
@@ -891,7 +891,7 @@ func cloneTeamRepos(ctx context.Context, client *github.Client, org string, team
 }
 
 func scanTeamRepos(org string) error {
-	err := scanDir("/tmp/repos/team/", org)
+	err := scanDir("./tmp/repos/team/", org)
 	check(err)
 	return nil
 }
@@ -1026,7 +1026,7 @@ func main() {
 
 		var url, repoorgist, fpath, rn, lastString, orgoruserName string
 		var splitArray []string
-		var bpath = "/tmp/repos/"
+		var bpath = "./tmp/repos/"
 
 		if *repoURL != "" { //repoURL
 			if *enterpriseURL != "" && strings.Split(strings.Split(*repoURL, "/")[0], "@")[0] != "git" {
