@@ -830,7 +830,7 @@ func findTeamByName(ctx context.Context, client *github.Client, org string, team
 	}
 	Info("Listing teams...")
 	for {
-		teams, resp, err := client.Organizations.ListTeams(ctx, org, listTeamsOpts)
+		teams, resp, err := client.Teams.ListTeams(ctx, org, listTeamsOpts)
 		check(err)
 		//check the name here--try to avoid additional API calls if we've found the team
 		for _, team := range teams {
@@ -860,7 +860,7 @@ func cloneTeamRepos(ctx context.Context, client *github.Client, org string, team
 
 		Info("Listing team repositories...")
 		for {
-			repos, resp, err := client.Organizations.ListTeamRepos(ctx, *team.ID, listTeamRepoOpts)
+			repos, resp, err := client.Teams.ListTeamRepos(ctx, *team.ID, listTeamRepoOpts)
 			check(err)
 			teamRepos = append(teamRepos, repos...) //adding to the repo array
 			if resp.NextPage == 0 {
